@@ -1,19 +1,20 @@
 # import .inference
 # import .train
 # import .update
+from .utils import preprocess
 
 
 def process_single(input: str):
     """
     """
     # preprocessing
-    tokenized = input.split()
+    preprocessed = preprocess(input)
 
     # perform inference with the model
     # result = inference.run(preprocessed)
 
     result = {}
-    for token in tokenized:
+    for token in preprocessed:
         result[token] = 'POLARITY'
 
     return result
