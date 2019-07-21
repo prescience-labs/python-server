@@ -28,7 +28,15 @@ def preprocess(input: str) -> list:
     sentences = {}
     for i, s in enumerate(sents):
         doc = nlp(s)
-        info = doc2dict(doc)
+        # info = [chunk.text for chunk in doc.noun_chunks]
+        info = []
+        for chunk in doc.noun_chunks:
+            for token in doc:
+                if token.text == chunk.root.head.text:
+                    group = [str(child) for child in token.children]
+                    group.append(token.text)
+                    info.append(group)
+        # info = doc2dict(doc)
         sentences[f'sentence_{i}'] = (s, info)
 
     return sentences

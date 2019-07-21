@@ -13,10 +13,6 @@ def process_single(input: str):
     # perform inference with the model
     # result = inference(preprocessed)
 
-    # result = {}
-    # for token in preprocessed:
-    #     result[token] = 'POLARITY'
-
     # return result
     return preprocessed
 
