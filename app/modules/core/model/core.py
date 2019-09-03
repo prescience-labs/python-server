@@ -1,7 +1,8 @@
 from .inference import inference
 from .train import train
 from .update import update
-from .utils import auto_aspect
+# from .utils import preprocess
+from .auto_aspect import auto_aspect
 
 
 def process_single(input: str):
