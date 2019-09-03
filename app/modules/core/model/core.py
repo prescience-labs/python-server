@@ -1,20 +1,20 @@
 from .inference import inference
 from .train import train
 from .update import update
-from .utils import preprocess
+from .utils import auto_aspect
 
 
 def process_single(input: str):
     """
     """
-    # preprocessing
-    preprocessed = preprocess(input)
+    # auto-aspect
+    custom_aspects = auto_aspect(input)
 
     # perform inference with the model
     # result = inference(preprocessed)
 
     # return result
-    return preprocessed
+    return custom_aspects
 
 
 def train_model():
