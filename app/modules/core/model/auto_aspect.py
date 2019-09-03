@@ -19,16 +19,22 @@ def auto_aspect(in_review: str) -> dict:
 
     # distill candidates into clean aspect lexicon
     aspects = set()
-    # the singles
     for candidate in lower_candidates:
         aspects.add(candidate)
-    # extract multi-word entities
+
+    # extract multi-word entities by grouping aspect terms that are neighbors (heuristic!)
     for sent_idx, dict_of_token_dicts in doc_dict.items():
         for i,j in zip(list(dict_of_token_dicts.items()), list(dict_of_token_dicts.items())[1:]):
             if i[1]['is_aspect']==j[1]['is_aspect'] and i[1]['is_aspect']:
                 aspects.add(f'{i[0]} {j[0]}'.lower())
 
-    # if token pos startswith V and in aspects, remove
+    # exclude aspects that were contextually POS-tagged as Verbs of any kind
+    for sent_idx, dict_of_token_dicts in doc_dict.items():
+        for token, info in dict_of_token_dicts.items():
+            low_token = token.text.lower()
+            if low_token in aspects:
+                if info['pos'].startswith('V'):
+                    aspects.remove(low_token)
 
     return list(aspects)
 

@@ -33,3 +33,9 @@ def preprocess(input: str) -> list:
         sentences[f'sentence_{i}'] = (s, info)
 
     return sentences
+
+
+def load_opinion(None) -> set:
+    """
+    """
+    pass
