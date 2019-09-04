@@ -205,7 +205,7 @@ class SentimentInference(object):
                 all_pairs.append([aspect_key, opinion['text'], over_all_score, polarity,
                                   sentence_text])
                 events.append(terms)
-        return all_pairs, eventsS
+        return all_pairs, events
 
 from nlp_architect.pipelines.spacy_bist import SpacyBISTParser
 
