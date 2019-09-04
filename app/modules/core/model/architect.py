@@ -2,42 +2,444 @@ import math
 from os import PathLike
 from pathlib import Path
 from typing import Union
+import csv
+import json
+from enum import Enum
+from json import JSONEncoder
+from os import path, remove, makedirs
 
-from nlp_architect.common.core_nlp_doc import CoreNLPDoc
-from nlp_architect.models.absa import INFERENCE_OUT
-from nlp_architect.models.absa.inference.data_types import Term, TermType, Polarity, SentimentDoc,\
-    SentimentSentence, LexiconElement
-from nlp_architect.models.absa.utils import _read_lexicon_from_csv, load_opinion_lex, \
-    _load_aspect_lexicon
+# from nlp_architect.common.core_nlp_doc import CoreNLPDoc
+# from nlp_architect.models.absa.inference.data_types import Term, TermType, Polarity, SentimentDoc,\
+#     SentimentSentence, LexiconElement
+# from nlp_architect.models.absa.utils import load_opinion_lex, \
+#     _load_aspect_lexicon
 
 INTENSIFIER_FACTOR = 0.3
 VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
 
 
+class LexiconElement(object):
+    def __init__(self, term: list, score: str or float = None, polarity: str = None,
+                 is_acquired: str = None, position: str = None):
+        self.term = term
+        self.polarity = polarity
+        try:
+            self.score = float(score)
+        except TypeError:
+            self.score = 0
+        self.position = position
+        if is_acquired == "N":
+            self.is_acquired = False
+        elif is_acquired == "Y":
+            self.is_acquired = True
+        else:
+            self.is_acquired = None
+
+    def __lt__(self, other):
+        return self.term[0] < other.term[0]
+
+    def __le__(self, other):
+        return self.term[0] <= other.term[0]
+
+    def __eq__(self, other):
+        return self.term[0] == other.term[0]
+
+    def __ne__(self, other):
+        return self.term[0] != other.term[0]
+
+    def __gt__(self, other):
+        return self.term[0] > other.term[0]
+
+    def __ge__(self, other):
+        return self.term[0] >= other.term[0]
+
+
+class TermType(Enum):
+    OPINION = 'OP'
+    ASPECT = 'AS'
+    NEGATION = 'NEG'
+    INTENSIFIER = 'INT'
+
+
+class Polarity(Enum):
+    POS = 'POS'
+    NEG = 'NEG'
+    UNK = 'UNK'
+
+
+class Term(object):
+    def __init__(self, text: str, kind: TermType, polarity: Polarity, score: float, start: int,
+                 length: int):
+        self._text = text
+        self._type = kind
+        self._polarity = polarity
+        self._score = score
+        self._start = start
+        self._len = length
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    @property
+    def text(self):
+        return self._text
+
+    @property
+    def type(self):
+        return self._type
+
+    @property
+    def polarity(self):
+        return self._polarity
+
+    @property
+    def score(self):
+        return self._score
+
+    @property
+    def start(self):
+        return self._start
+
+    @property
+    def len(self):
+        return self._len
+
+    @text.setter
+    def text(self, val):
+        self._text = val
+
+    @score.setter
+    def score(self, val):
+        self._score = val
+
+    @polarity.setter
+    def polarity(self, val):
+        self._polarity = val
+
+    def __str__(self):
+        return "text: " + self._text + " type: " + str(self._type) + " pol: " + \
+               str(self._polarity) + " score: " + str(self._score) + " start: " + \
+               str(self._start) + " len: " + \
+               str(self._len)
+
+
+class SentimentDoc(object):
+    def __init__(self, doc_text: str = None, sentences: list = None):
+        if sentences is None:
+            sentences = []
+        self._doc_text = doc_text
+        self._sentences = sentences
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    @property
+    def doc_text(self):
+        return self._doc_text
+
+    @doc_text.setter
+    def doc_text(self, val):
+        self._doc_text = val
+
+    @property
+    def sentences(self):
+        return self._sentences
+
+    @sentences.setter
+    def sentences(self, val):
+        self._sentences = val
+
+    @staticmethod
+    def decoder(obj):
+        """
+        :param obj: object to be decoded
+        :return: decoded Sentence object
+        """
+        # SentimentDoc
+        if '_doc_text' in obj and '_sentences' in obj:
+            return SentimentDoc(obj['_doc_text'], obj['_sentences'])
+
+        # SentimentSentence
+        if all((attr in obj for attr in ('_start', '_end', '_events'))):
+            return SentimentSentence(obj['_start'], obj['_end'], obj['_events'])
+
+        # Term
+        if all(attr in obj for attr in
+               ('_text', '_type', '_score', '_polarity', '_start', '_len')):
+            return Term(obj['_text'], TermType[obj['_type']],
+                        Polarity[obj['_polarity']], obj['_score'], obj['_start'],
+                        obj['_len'])
+        return obj
+
+    def __repr__(self):
+        return self.pretty_json()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __iter__(self):
+        return self.sentences.__iter__()
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def json(self):
+        """
+        Return json representations of the object
+        Returns:
+            :obj:`json`: json representations of the object
+        """
+        return json.dumps(self, cls=SentimentDocEncoder)
+
+    def pretty_json(self):
+        """
+        Return pretty json representations of the object
+        Returns:
+            :obj:`json`: pretty json representations of the object
+        """
+        return json.dumps(self, cls=SentimentDocEncoder, indent=4)
+
+
+class SentimentSentence(object):
+    def __init__(self, start: int, end: int, events: list):
+        self._start = start
+        self._end = end
+        self._events = events
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    @property
+    def start(self):
+        return self._start
+
+    @start.setter
+    def start(self, val):
+        self._start = val
+
+    @property
+    def end(self):
+        return self._end
+
+    @end.setter
+    def end(self, val):
+        self._end = val
+
+    @property
+    def events(self):
+        return self._events
+
+    @events.setter
+    def events(self, val):
+        self._events = val
+
+
+def _read_lexicon_from_csv(lexicon_path: Union[str, PathLike]) -> dict:
+    """Read a lexicon from a CSV file.
+    Returns:
+        Dictionary of LexiconElements, each LexiconElement presents a row.
+    """
+    lexicon = {}
+    ABSA_ROOT = Path(path.realpath(__file__)).parent
+    INFERENCE_LEXICONS = ABSA_ROOT / 'lexicons'
+    with open(INFERENCE_LEXICONS / lexicon_path, newline='', encoding="utf-8") as csv_file:
+        reader = csv.reader(csv_file, delimiter=',', quotechar='|')
+        for row in reader:
+            try:
+                lexicon[row[0]] = LexiconElement(term=row[0], score=row[1], polarity=None,
+                                                 is_acquired=None, position=row[2])
+            except Exception:
+                lexicon[row[0]] = LexiconElement(term=row[0], score=row[1], polarity=None,
+                                                 is_acquired=None, position=None)
+    return lexicon
+
+
+def _load_opinion_lex(file_name: Union[str, PathLike]) -> dict:
+    """Read opinion lexicon from CSV file.
+    Returns:
+        Dictionary of LexiconElements, each LexiconElement presents a row.
+    """
+    ABSA_ROOT = Path(path.realpath(__file__)).parent
+    opinion_lex_name = ABSA_ROOT / 'lexicons' / file_name
+    lexicon = {}
+    with open(opinion_lex_name, newline='', encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+        next(reader)
+        for row in reader:
+            term, score, polarity, is_acquired = row[0], row[1], row[2], row[3]
+            score = float(score)
+            # ignore terms with low score
+            if score >= 0.5 and polarity in (Polarity.POS.value, Polarity.NEG.value):
+                lexicon[term] = \
+                    LexiconElement(term.lower(),
+                                   score if polarity == Polarity.POS.value else -score, polarity,
+                                   is_acquired)
+    return lexicon
+
+
+def _load_aspect_lexicon(file_name: Union[str, PathLike]):
+    """Read aspect lexicon from CSV file.
+    Returns: Dictionary of LexiconElements, each LexiconElement presents a row.
+    """
+    lexicon = []
+    with open(file_name, newline='', encoding="utf-8-sig") as csv_file:
+        reader = csv.reader(csv_file, delimiter=',', quotechar='|')
+        next(reader)
+        for row in reader:
+            lexicon.append(LexiconElement(row))
+    return lexicon
+
+
+def _load_aspects_from_dict(aspect_lex: dict):
+    """BPS version
+    Returns: Dictionary?? of LexiconElements, each LexiconElement presents a row.
+    """
+    lexicon = []
+    for asp_head, variants in aspect_lex.items():
+        lexicon.append(LexiconElement(variants))
+    return lexicon
+
+
+class CoreNLPDoc(object):
+    """Object for core-components (POS, Dependency Relations, etc).
+    Attributes:
+        _doc_text: the doc text
+        _sentences: list of sentences, each word in a sentence is
+            represented by a dictionary, structured as follows: {'start': (int), 'len': (int),
+            'pos': (str), 'ner': (str), 'lemma': (str), 'gov': (int), 'rel': (str)}
+    """
+    def __init__(self, doc_text: str = '', sentences: list = None):
+        if sentences is None:
+            sentences = []
+        self._doc_text = doc_text
+        self._sentences = sentences
+
+    @property
+    def doc_text(self):
+        return self._doc_text
+
+    @doc_text.setter
+    def doc_text(self, val):
+        self._doc_text = val
+
+    @property
+    def sentences(self):
+        return self._sentences
+
+    @sentences.setter
+    def sentences(self, val):
+        self._sentences = val
+
+    @staticmethod
+    def decoder(obj):
+        if '_doc_text' in obj and '_sentences' in obj:
+            return CoreNLPDoc(obj['_doc_text'], obj['_sentences'])
+        return obj
+
+    def __repr__(self):
+        return self.pretty_json()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __iter__(self):
+        return self.sentences.__iter__()
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def json(self):
+        """Returns json representations of the object."""
+        return json.dumps(self.__dict__)
+
+    def pretty_json(self):
+        """Returns pretty json representations of the object."""
+        return json.dumps(self.__dict__, indent=4)
+
+    def sent_text(self, i):
+        parsed_sent = self.sentences[i]
+        first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
+        return self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
+
+    def sent_iter(self):
+        for parsed_sent in self.sentences:
+            first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
+            sent_text = self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
+            yield sent_text, parsed_sent
+
+    def brat_doc(self):
+        """Returns doc adapted to BRAT expected input."""
+        doc = {'text': '', 'entities': [], 'relations': []}
+        tok_count = 0
+        rel_count = 1
+        for sentence in self.sentences:
+            sentence_start = sentence[0]['start']
+            sentence_end = sentence[-1]['start'] + sentence[-1]['len']
+            doc['text'] = doc['text'] + '\n' + self.doc_text[sentence_start:sentence_end]
+            token_offset = tok_count
+
+            for token in sentence:
+                start = token['start']
+                end = start + token['len']
+                doc['entities'].append(['T' + str(tok_count), token['pos'], [[start, end]]])
+
+                if token['gov'] != -1 and token['rel'] != 'punct':
+                    doc['relations'].append(
+                        [rel_count, token['rel'], [['', 'T' + str(token_offset + token['gov'])],
+                                                   ['', 'T' + str(tok_count)]]])
+                    rel_count += 1
+                tok_count += 1
+        doc['text'] = doc['text'][1:]
+        return doc
+
+    def displacy_doc(self):
+        """Return doc adapted to displacyENT expected input."""
+        doc = []
+        for sentence in self.sentences:
+            sentence_doc = {'arcs': [], 'words': []}
+            # Merge punctuation:
+            merged_punct_sentence = merge_punctuation(sentence)
+            fix_gov_indexes(merged_punct_sentence, sentence)
+            for tok_index, token in enumerate(merged_punct_sentence):
+                sentence_doc['words'].append({'text': token['text'], 'tag': token['pos']})
+                dep_tok = tok_index
+                gov_tok = token['gov']
+                direction = 'left'
+                arc_start = dep_tok
+                arc_end = gov_tok
+                if dep_tok > gov_tok:
+                    direction = 'right'
+                    arc_start = gov_tok
+                    arc_end = dep_tok
+                if token['gov'] != -1 and token['rel'] != 'punct':
+                    sentence_doc['arcs'].append({'dir': direction, 'label': token['rel'],
+                                                 'start': arc_start, 'end': arc_end})
+            doc.append(sentence_doc)
+        return doc
+
+
 class SentimentInference(object):
     """Main class for sentiment inference execution.
     Attributes:
-        opinion_lex: Opinion lexicon as outputted by TrainSentiment module.
-        aspect_lex: Aspect lexicon as outputted by TrainSentiment module.
+        opinion_lex: Opinion lexicon as outputted by TrainSentiment module.  # TODO: change
+        aspect_lex: Aspect lexicon as outputted by TrainSentiment module.  # TODO: change
         intensifier_lex (dict): Pre-defined intensifier lexicon.
         negation_lex (dict): Pre-defined negation lexicon.
     """
 
-    def __init__(self, aspect_lex: Union[str, PathLike], opinion_lex: Union[str, PathLike, dict],
-                 parse: bool = True):
+    def __init__(self, aspect_lex: dict, opinion_lex: str, parse: bool = False):
         """Inits SentimentInference with given aspect and opinion lexicons."""
-        INFERENCE_OUT.mkdir(parents=True, exist_ok=True)
-        self.opinion_lex = \
-            opinion_lex if type(opinion_lex) is dict else load_opinion_lex(Path(opinion_lex))
-        self.aspect_lex = _load_aspect_lexicon(Path(aspect_lex))
+        self.aspect_lex = _load_aspects_from_dict(aspect_lex)  # custom aspects from auto-aspect
+        self.opinion_lex = _load_opinion_lex(opinion_lex)  # have this as hardcoded like below?
         self.intensifier_lex = _read_lexicon_from_csv('IntensifiersLex.csv')
         self.negation_lex = _read_lexicon_from_csv('NegationSentLex.csv')
-
-        if parse:
-            from nlp_architect.pipelines.spacy_bist import SpacyBISTParser
-            self.parser = SpacyBISTParser(spacy_model='en')
-        else:
-            self.parser = None
+        self.parser = None  # necessary?
 
     def run(self, doc: str = None, parsed_doc: CoreNLPDoc = None) -> SentimentDoc:
         """Run SentimentInference on a single document.
@@ -207,19 +609,233 @@ class SentimentInference(object):
                 events.append(terms)
         return all_pairs, events
 
-from nlp_architect.pipelines.spacy_bist import SpacyBISTParser
+
+# from nlp_architect.pipelines.spacy_bist import SpacyBISTParser
+
+# TODO
+# from nlp_architect.common.core_nlp_doc import CoreNLPDoc
+# from nlp_architect.data.conll import ConllEntry
+# from nlp_architect.models.bist_parser import BISTModel
+# from nlp_architect import LIBRARY_OUT
+# from nlp_architect.utils.io import download_unlicensed_file, uncompress_file
+# from nlp_architect.utils.io import validate
+# from nlp_architect.utils.text import SpacyInstance
 
 
-def inference(data: str, aspect_lex: list, opinion_lex: set) -> dict:
+# class SpacyBISTParser(object):
+#     """Main class which handles parsing with Spacy-BIST parser.
+#     Args:
+#         verbose (bool, optional): Controls output verbosity.
+#         spacy_model (str, optional): Spacy model to use
+#         (see https://spacy.io/api/top-level#spacy.load).
+#         bist_model (str, optional): Path to a .model file to load. Defaults pre-trained model'.
+#     """
+#     dir = LIBRARY_OUT / 'bist-pretrained'
+#     _pretrained = dir / 'bist.model'
+#
+#     def __init__(self, verbose=False, spacy_model='en', bist_model=None):
+#         validate((verbose, bool), (spacy_model, str, 0, 1000),
+#                  (bist_model, (type(None), str), 0, 1000))
+#         if not bist_model:
+#             print("Using pre-trained BIST model.")
+#             _download_pretrained_model()
+#             bist_model = SpacyBISTParser._pretrained
+#
+#         self.verbose = verbose
+#         self.bist_parser = BISTModel()
+#         self.bist_parser.load(bist_model if bist_model else SpacyBISTParser._pretrained)
+#         self.spacy_parser = SpacyInstance(spacy_model,
+#                                           disable=['ner', 'vectors', 'textcat']).parser
+#
+#     def to_conll(self, doc_text):
+#         """Converts a document to CoNLL format with spacy POS tags.
+#         Args:
+#             doc_text (str): raw document text.
+#         Yields:
+#             list of ConllEntry: The next sentence in the document in CoNLL format.
+#         """
+#         validate((doc_text, str))
+#         for sentence in self.spacy_parser(doc_text).sents:
+#             sentence_conll = [ConllEntry(0, '*root*', '*root*', 'ROOT-POS', 'ROOT-CPOS', '_',
+#                                          -1, 'rroot', '_', '_')]
+#             i_tok = 0
+#             for tok in sentence:
+#                 if self.verbose:
+#                     print(tok.text + '\t' + tok.tag_)
+#
+#                 if not tok.is_space:
+#                     pos = tok.tag_
+#                     text = tok.text
+#
+#                     if text != '-' or pos != 'HYPH':
+#                         pos = _spacy_pos_to_ptb(pos, text)
+#                         token_conll = ConllEntry(i_tok + 1, text, tok.lemma_, pos, pos,
+#                                                  tok.ent_type_, -1, '_', '_', tok.idx)
+#                         sentence_conll.append(token_conll)
+#                         i_tok += 1
+#
+#             if self.verbose:
+#                 print('-----------------------\ninput conll form:')
+#                 for entry in sentence_conll:
+#                     print(str(entry.id) + '\t' + entry.form + '\t' + entry.pos + '\t')
+#             yield sentence_conll
+#
+#     def parse(self, doc_text, show_tok=True, show_doc=True):
+#         """Parse a raw text document.
+#         Args:
+#             doc_text (str)
+#             show_tok (bool, optional): Specifies whether to include token text in output.
+#             show_doc (bool, optional): Specifies whether to include document text in output.
+#         Returns:
+#             CoreNLPDoc: The annotated document.
+#         """
+#         validate((doc_text, str), (show_tok, bool), (show_doc, bool))
+#         doc_conll = self.to_conll(doc_text)
+#         parsed_doc = CoreNLPDoc()
+#
+#         if show_doc:
+#             parsed_doc.doc_text = doc_text
+#
+#         for sent_conll in self.bist_parser.predict_conll(doc_conll):
+#             parsed_sent = []
+#             conj_governors = {'and': set(), 'or': set()}
+#
+#             for tok in sent_conll:
+#                 gov_id = int(tok.pred_parent_id)
+#                 rel = tok.pred_relation
+#
+#                 if tok.form != '*root*':
+#                     if tok.form.lower() == 'and':
+#                         conj_governors['and'].add(gov_id)
+#                     if tok.form.lower() == 'or':
+#                         conj_governors['or'].add(gov_id)
+#
+#                     if rel == 'conj':
+#                         if gov_id in conj_governors['and']:
+#                             rel += '_and'
+#                         if gov_id in conj_governors['or']:
+#                             rel += '_or'
+#
+#                     parsed_tok = {'start': tok.misc, 'len': len(tok.form),
+#                                   'pos': tok.pos, 'ner': tok.feats,
+#                                   'lemma': tok.lemma, 'gov': gov_id - 1,
+#                                   'rel': rel}
+#
+#                     if show_tok:
+#                         parsed_tok['text'] = tok.form
+#                     parsed_sent.append(parsed_tok)
+#             if parsed_sent:
+#                 parsed_doc.sentences.append(parsed_sent)
+#         return parsed_doc
+
+
+# def _download_pretrained_model():
+#     """Downloads the pre-trained BIST model if non-existent."""
+#     if not path.isfile(SpacyBISTParser.dir / 'bist.model'):
+#         print('Downloading pre-trained BIST model...')
+#         zip_path = SpacyBISTParser.dir / 'bist-pretrained.zip'
+#         makedirs(SpacyBISTParser.dir, exist_ok=True)
+#         download_unlicensed_file(
+#             'https://s3-us-west-2.amazonaws.com/nlp-architect-data/models/dep_parse/',
+#             'bist-pretrained.zip', zip_path)
+#         print('Unzipping...')
+#         uncompress_file(zip_path, outpath=str(SpacyBISTParser.dir))
+#         remove(zip_path)
+#         print('Done.')
+
+
+# def _spacy_pos_to_ptb(pos, text):
+#     """
+#     Converts a Spacy part-of-speech tag to a Penn Treebank part-of-speech tag.
+#     Args:
+#         pos (str): Spacy POS tag.
+#         text (str): The token text.
+#     Returns:
+#         ptb_tag (str): Standard PTB POS tag.
+#     """
+#     validate((pos, str, 0, 30), (text, str, 0, 1000))
+#     ptb_tag = pos
+#     if text in ['...', '—']:
+#         ptb_tag = ':'
+#     elif text == '*':
+#         ptb_tag = 'SYM'
+#     elif pos == 'AFX':
+#         ptb_tag = 'JJ'
+#     elif pos == 'ADD':
+#         ptb_tag = 'NN'
+#     elif text != pos and text in [',', '.', ":", '``', '-RRB-', '-LRB-']:
+#         ptb_tag = text
+#     elif pos in ['NFP', 'HYPH', 'XX']:
+#         ptb_tag = 'SYM'
+#     return ptb_tag
+
+
+def merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text, is_traverse):
+    # merge the text of the punct tok
+    if is_traverse:
+        merged_punct_sentence[last_merged_punct_index]["text"] = \
+            punct_text + merged_punct_sentence[last_merged_punct_index]["text"]
+    else:
+        merged_punct_sentence[last_merged_punct_index]["text"] = \
+            merged_punct_sentence[last_merged_punct_index]["text"] + punct_text
+
+
+def find_correct_index(orig_gov, merged_punct_sentence):
+    for tok_index, tok in enumerate(merged_punct_sentence):
+        if tok["start"] == orig_gov["start"] and tok["len"] == orig_gov["len"] and tok["pos"] == \
+                orig_gov["pos"] and tok["text"] == orig_gov["text"]:
+            return tok_index
+    return None
+
+
+def fix_gov_indexes(merged_punct_sentence, sentence):
+    for merged_token in merged_punct_sentence:
+        tok_gov = merged_token['gov']
+        if tok_gov == -1:  # gov is root
+            merged_token['gov'] = -1
+        else:
+            orig_gov = sentence[tok_gov]
+            correct_index = find_correct_index(orig_gov, merged_punct_sentence)
+            merged_token['gov'] = correct_index
+
+
+def merge_punctuation(sentence):
+    merged_punct_sentence = []
+    tmp_punct_text = None
+    punct_text = None
+    last_merged_punct_index = -1
+    for tok_index, token in enumerate(sentence):
+        if token['rel'] == 'punct':
+            punct_text = token["text"]
+            if tok_index < 1:  # this is the first tok - append to the next token
+                tmp_punct_text = punct_text
+            else:  # append to the previous token
+                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
+                                False)
+        else:
+            merged_punct_sentence.append(token)
+            last_merged_punct_index = last_merged_punct_index + 1
+            if tmp_punct_text is not None:
+                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
+                                True)
+                tmp_punct_text = None
+    return merged_punct_sentence
+
+
+def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     """BPS version of intel's SentimentSolution.run()
     """
     # initialize the inference engine object
     inference = SentimentInference(aspect_lex, opinion_lex, parse=False)
+
     # source data is raw text, need to parse
-    parse = SpacyBISTParser().parse
+    # parse = SpacyBISTParser().parse
+
     # run inference on the data
-    results = {}
-    parsed_doc = parse(doc)  # but do this with preprocessing?
-    sentiment_doc = inference.run(parsed_doc=parsed_doc)
+    # parsed_doc = parse(doc)  # but do this with preprocessing?
+
+    # sentiment_doc = inference.run(parsed_doc=parsed_doc)
+    sentiment_doc = {'aspects': aspect_lex,
+                     'opinions': opinion_lex}
 
     return sentiment_doc

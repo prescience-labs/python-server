@@ -35,7 +35,7 @@ def preprocess(input: str) -> list:
     return sentences
 
 
-def load_opinion(None) -> set:
+def load_opinion() -> set:
     """
     """
     pass

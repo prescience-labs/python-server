@@ -15,10 +15,12 @@ def process_single(input: str):
     custom_aspects = auto_aspect(input)
 
     # load a pre-trained opinion lexicon
-    opinion_lex = load_opinion()
+    # opinion_lex = load_opinion()
+    opinion_lex = 'opinion_lex.csv'
 
     # preprocessing
-    preprocessed = preprocess(input)
+    # preprocessed = preprocess(input)
+    preprocessed = input
 
     # perform inference with the model
     result = inference(preprocessed, custom_aspects, opinion_lex)

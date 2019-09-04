@@ -29,14 +29,20 @@ def auto_aspect(in_review: str) -> dict:
                 aspects.add(f'{i[0]} {j[0]}'.lower())
 
     # exclude aspects that were contextually POS-tagged as Verbs of any kind
+    # TODO: maybe exclude adjectives? check for other triggers but with an eye on recall
     for sent_idx, dict_of_token_dicts in doc_dict.items():
         for token, info in dict_of_token_dicts.items():
             low_token = token.text.lower()
             if low_token in aspects:
-                if info['pos'].startswith('V'):
+                if info['pos'].startswith('V') or info['pos'].startswith('AD'):
                     aspects.remove(low_token)
 
-    return list(aspects)
+    # spin up synonyms for each aspect into dict format
+    aspect_dict = {}
+    for asp in aspects:
+        aspect_dict[asp] = [asp, asp.upper(), asp.lower(), asp + 's']
+
+    return aspect_dict
 
 
 def build_dict_from_doc(doc, lower_candidates) -> dict:
