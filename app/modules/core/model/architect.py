@@ -18,6 +18,7 @@ import posixpath
 import re
 import zipfile
 from typing import List, Tuple
+import spacy
 
 import requests
 from tqdm import tqdm
@@ -244,153 +245,6 @@ class SentimentSentence(object):
     @events.setter
     def events(self, val):
         self._events = val
-
-
-class CoreNLPDoc(object):
-    """Object for core-components (POS, Dependency Relations, etc).
-    Attributes:
-        _doc_text: the doc text
-        _sentences: list of sentences, each word in a sentence is
-            represented by a dictionary, structured as follows: {'start': (int), 'len': (int),
-            'pos': (str), 'ner': (str), 'lemma': (str), 'gov': (int), 'rel': (str)}
-    """
-    def __init__(self, doc_text: str = '', sentences: list = None):
-        if sentences is None:
-            sentences = []
-        self._doc_text = doc_text
-        self._sentences = sentences
-
-    @property
-    def doc_text(self):
-        return self._doc_text
-
-    @doc_text.setter
-    def doc_text(self, val):
-        self._doc_text = val
-
-    @property
-    def sentences(self):
-        return self._sentences
-
-    @sentences.setter
-    def sentences(self, val):
-        self._sentences = val
-
-    @staticmethod
-    def decoder(obj):
-        if '_doc_text' in obj and '_sentences' in obj:
-            return CoreNLPDoc(obj['_doc_text'], obj['_sentences'])
-        return obj
-
-    def __repr__(self):
-        return self.pretty_json()
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __iter__(self):
-        return self.sentences.__iter__()
-
-    def __len__(self):
-        return len(self.sentences)
-
-    def json(self):
-        """Returns json representations of the object."""
-        return json.dumps(self.__dict__)
-
-    def pretty_json(self):
-        """Returns pretty json representations of the object."""
-        return json.dumps(self.__dict__, indent=4)
-
-    def sent_text(self, i):
-        parsed_sent = self.sentences[i]
-        first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
-        return self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
-
-    def sent_iter(self):
-        for parsed_sent in self.sentences:
-            first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
-            sent_text = self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
-            yield sent_text, parsed_sent
-
-    def brat_doc(self):
-        """Returns doc adapted to BRAT expected input."""
-        doc = {'text': '', 'entities': [], 'relations': []}
-        tok_count = 0
-        rel_count = 1
-        for sentence in self.sentences:
-            sentence_start = sentence[0]['start']
-            sentence_end = sentence[-1]['start'] + sentence[-1]['len']
-            doc['text'] = doc['text'] + '\n' + self.doc_text[sentence_start:sentence_end]
-            token_offset = tok_count
-
-            for token in sentence:
-                start = token['start']
-                end = start + token['len']
-                doc['entities'].append(['T' + str(tok_count), token['pos'], [[start, end]]])
-
-                if token['gov'] != -1 and token['rel'] != 'punct':
-                    doc['relations'].append(
-                        [rel_count, token['rel'], [['', 'T' + str(token_offset + token['gov'])],
-                                                   ['', 'T' + str(tok_count)]]])
-                    rel_count += 1
-                tok_count += 1
-        doc['text'] = doc['text'][1:]
-        return doc
-
-    def displacy_doc(self):
-        """Return doc adapted to displacyENT expected input."""
-        doc = []
-        for sentence in self.sentences:
-            sentence_doc = {'arcs': [], 'words': []}
-            # Merge punctuation:
-            merged_punct_sentence = merge_punctuation(sentence)
-            fix_gov_indexes(merged_punct_sentence, sentence)
-            for tok_index, token in enumerate(merged_punct_sentence):
-                sentence_doc['words'].append({'text': token['text'], 'tag': token['pos']})
-                dep_tok = tok_index
-                gov_tok = token['gov']
-                direction = 'left'
-                arc_start = dep_tok
-                arc_end = gov_tok
-                if dep_tok > gov_tok:
-                    direction = 'right'
-                    arc_start = gov_tok
-                    arc_end = dep_tok
-                if token['gov'] != -1 and token['rel'] != 'punct':
-                    sentence_doc['arcs'].append({'dir': direction, 'label': token['rel'],
-                                                 'start': arc_start, 'end': arc_end})
-            doc.append(sentence_doc)
-        return doc
-
-
-class ConllEntry:
-    def __init__(self, eid, form, lemma, pos, cpos, feats=None, parent_id=None, relation=None,
-                 deps=None, misc=None):
-        self.id = eid
-        self.form = form
-        self.norm = normalize(form)
-        self.cpos = cpos.upper()
-        self.pos = pos.upper()
-        self.parent_id = parent_id
-        self.relation = relation
-
-        self.lemma = lemma
-        self.feats = feats
-        self.deps = deps
-        self.misc = misc
-
-        self.pred_parent_id = None
-        self.pred_relation = None
-
-        self.vec = None
-        self.lstms = None
-
-    def __str__(self):
-        values = [str(self.id), self.form, self.lemma, self.cpos, self.pos, self.feats,
-                  str(self.pred_parent_id) if self.pred_parent_id is not None else None,
-                  self.pred_relation, self.deps, self.misc]
-        return '\t'.join(['_' if v is None else v for v in values])
 
 
 ################################## BISTParser ##################################
@@ -754,219 +608,6 @@ def bio_to_spans(text: List[str], tags: List[str]) -> List[Tuple[int, int, str]]
     return spans
 
 
-class BISTModel(object):
-    """
-    BIST parser model class.
-    This class handles training, prediction, loading and saving of a BIST parser model.
-    After the model is initialized, it accepts a CoNLL formatted dataset as input, and learns to
-    output dependencies for new input.
-    Args:
-        activation (str, optional): Activation function to use.
-        lstm_layers (int, optional): Number of LSTM layers to use.
-        lstm_dims (int, optional): Number of LSTM dimensions to use.
-        pos_dims (int, optional): Number of part-of-speech embedding dimensions to use.
-    Attributes:
-        model (MSTParserLSTM): The underlying LSTM model.
-        params (tuple): Additional parameters and resources for the model.
-        options (dict): User model options.
-    """
-
-    def __init__(self, activation='tanh', lstm_layers=2, lstm_dims=125, pos_dims=25):
-        validate((activation, str), (lstm_layers, int, 0, None), (lstm_dims, int, 0, 1000),
-                 (pos_dims, int, 0, 1000))
-        self.options = get_options_dict(activation, lstm_dims, lstm_layers, pos_dims)
-        self.params = None
-        self.model = None
-
-    def fit(self, dataset, epochs=10, dev=None):
-        """
-        Trains a BIST model on an annotated dataset in CoNLL file format.
-        Args:
-            dataset (str): Path to input dataset for training, formatted in CoNLL/U format.
-            epochs (int, optional): Number of learning iterations.
-            dev (str, optional): Path to development dataset for conducting evaluations.
-        """
-        if dev:
-            dev = validate_existing_filepath(dev)
-        dataset = validate_existing_filepath(dataset)
-        validate((epochs, int, 0, None))
-
-        print('\nRunning fit on ' + dataset + '...\n')
-        words, w2i, pos, rels = vocab(dataset)
-        self.params = words, w2i, pos, rels, self.options
-
-        from nlp_architect.models.bist.mstlstm import MSTParserLSTM
-        self.model = MSTParserLSTM(*self.params)
-
-        for epoch in range(epochs):
-            print('Starting epoch', epoch + 1)
-            self.model.train(dataset)
-            if dev:
-                ext = dev.rindex('.')
-                res_path = dev[:ext] + '_epoch_' + str(epoch + 1) + '_pred' + dev[ext:]
-                write_conll(res_path, self.model.predict(dev))
-                run_eval(dev, res_path)
-
-    def predict(self, dataset, evaluate=False):
-        """
-        Runs inference with the BIST model on a dataset in CoNLL file format.
-        Args:
-            dataset (str): Path to input CoNLL file.
-            evaluate (bool, optional): Write prediction and evaluation files to dataset's folder.
-        Returns:
-            res (list of list of ConllEntry): The list of input sentences with predicted
-            dependencies attached.
-        """
-        dataset = validate_existing_filepath(dataset)
-        validate((evaluate, bool))
-
-        print('\nRunning predict on ' + dataset + '...\n')
-        res = list(self.model.predict(conll_path=dataset))
-        if evaluate:
-            ext = dataset.rindex('.')
-            pred_path = dataset[:ext] + '_pred' + dataset[ext:]
-            write_conll(pred_path, res)
-            run_eval(dataset, pred_path)
-        return res
-
-    def predict_conll(self, dataset):
-        """
-        Runs inference with the BIST model on a dataset in CoNLL object format.
-        Args:
-            dataset (list of list of ConllEntry): Input in the form of ConllEntry objects.
-        Returns:
-            res (list of list of ConllEntry): The list of input sentences with predicted
-            dependencies attached.
-        """
-        res = None
-        if hasattr(dataset, '__iter__'):
-            res = list(self.model.predict(conll=dataset))
-        return res
-
-    def load(self, path):
-        """Loads and initializes a BIST model from file."""
-        with open(path.parent / 'params.json') as file:
-            self.params = json.load(file)
-
-        from nlp_architect.models.bist.mstlstm import MSTParserLSTM
-        self.model = MSTParserLSTM(*self.params)
-        self.model.model.populate(str(path))
-
-    def save(self, path):
-        """Saves the BIST model to file."""
-        print("Saving")
-        with open(os.path.join(os.path.dirname(path), 'params.json'), 'w') as file:
-            json.dump(self.params, file)
-        self.model.model.save(path)
-
-
-class SpacyBISTParser(object):
-    """Main class which handles parsing with Spacy-BIST parser.
-    Args:
-        verbose (bool, optional): Controls output verbosity.
-        spacy_model (str, optional): Spacy model to use
-        (see https://spacy.io/api/top-level#spacy.load).
-        bist_model (str, optional): Path to a .model file to load. Defaults pre-trained model'.
-    """
-    dir = Path('.') / 'bist-pretrained'
-    _pretrained = dir / 'bist.model'
-
-    def __init__(self, verbose=False, spacy_model='en', bist_model=None):
-        validate((verbose, bool), (spacy_model, str, 0, 1000),
-                 (bist_model, (type(None), str), 0, 1000))
-        if not bist_model:
-            print("Using pre-trained BIST model.")
-            _download_pretrained_model()
-            bist_model = SpacyBISTParser._pretrained
-
-        self.verbose = verbose
-        self.bist_parser = BISTModel()
-        self.bist_parser.load(bist_model if bist_model else SpacyBISTParser._pretrained)
-        self.spacy_parser = SpacyInstance(spacy_model,
-                                          disable=['ner', 'vectors', 'textcat']).parser
-
-    def to_conll(self, doc_text):
-        """Converts a document to CoNLL format with spacy POS tags.
-        Args:
-            doc_text (str): raw document text.
-        Yields:
-            list of ConllEntry: The next sentence in the document in CoNLL format.
-        """
-        validate((doc_text, str))
-        for sentence in self.spacy_parser(doc_text).sents:
-            sentence_conll = [ConllEntry(0, '*root*', '*root*', 'ROOT-POS', 'ROOT-CPOS', '_',
-                                         -1, 'rroot', '_', '_')]
-            i_tok = 0
-            for tok in sentence:
-                if self.verbose:
-                    print(tok.text + '\t' + tok.tag_)
-
-                if not tok.is_space:
-                    pos = tok.tag_
-                    text = tok.text
-
-                    if text != '-' or pos != 'HYPH':
-                        pos = _spacy_pos_to_ptb(pos, text)
-                        token_conll = ConllEntry(i_tok + 1, text, tok.lemma_, pos, pos,
-                                                 tok.ent_type_, -1, '_', '_', tok.idx)
-                        sentence_conll.append(token_conll)
-                        i_tok += 1
-
-            if self.verbose:
-                print('-----------------------\ninput conll form:')
-                for entry in sentence_conll:
-                    print(str(entry.id) + '\t' + entry.form + '\t' + entry.pos + '\t')
-            yield sentence_conll
-
-    def parse(self, doc_text, show_tok=True, show_doc=True):
-        """Parse a raw text document.
-        Args:
-            doc_text (str)
-            show_tok (bool, optional): Specifies whether to include token text in output.
-            show_doc (bool, optional): Specifies whether to include document text in output.
-        Returns:
-            CoreNLPDoc: The annotated document.
-        """
-        validate((doc_text, str), (show_tok, bool), (show_doc, bool))
-        doc_conll = self.to_conll(doc_text)
-        parsed_doc = CoreNLPDoc()
-
-        if show_doc:
-            parsed_doc.doc_text = doc_text
-
-        for sent_conll in self.bist_parser.predict_conll(doc_conll):
-            parsed_sent = []
-            conj_governors = {'and': set(), 'or': set()}
-
-            for tok in sent_conll:
-                gov_id = int(tok.pred_parent_id)
-                rel = tok.pred_relation
-
-                if tok.form != '*root*':
-                    if tok.form.lower() == 'and':
-                        conj_governors['and'].add(gov_id)
-                    if tok.form.lower() == 'or':
-                        conj_governors['or'].add(gov_id)
-
-                    if rel == 'conj':
-                        if gov_id in conj_governors['and']:
-                            rel += '_and'
-                        if gov_id in conj_governors['or']:
-                            rel += '_or'
-
-                    parsed_tok = {'start': tok.misc, 'len': len(tok.form),
-                                  'pos': tok.pos, 'ner': tok.feats,
-                                  'lemma': tok.lemma, 'gov': gov_id - 1,
-                                  'rel': rel}
-
-                    if show_tok:
-                        parsed_tok['text'] = tok.form
-                    parsed_sent.append(parsed_tok)
-            if parsed_sent:
-                parsed_doc.sentences.append(parsed_sent)
-        return parsed_doc
-
-
 def _download_pretrained_model():
     """Downloads the pre-trained BIST model if non-existent."""
     if not path.isfile(SpacyBISTParser.dir / 'bist.model'):
@@ -980,88 +621,6 @@ def _download_pretrained_model():
         uncompress_file(zip_path, outpath=str(SpacyBISTParser.dir))
         remove(zip_path)
         print('Done.')
-
-
-def _spacy_pos_to_ptb(pos, text):
-    """
-    Converts a Spacy part-of-speech tag to a Penn Treebank part-of-speech tag.
-    Args:
-        pos (str): Spacy POS tag.
-        text (str): The token text.
-    Returns:
-        ptb_tag (str): Standard PTB POS tag.
-    """
-    validate((pos, str, 0, 30), (text, str, 0, 1000))
-    ptb_tag = pos
-    if text in ['...', '—']:
-        ptb_tag = ':'
-    elif text == '*':
-        ptb_tag = 'SYM'
-    elif pos == 'AFX':
-        ptb_tag = 'JJ'
-    elif pos == 'ADD':
-        ptb_tag = 'NN'
-    elif text != pos and text in [',', '.', ":", '``', '-RRB-', '-LRB-']:
-        ptb_tag = text
-    elif pos in ['NFP', 'HYPH', 'XX']:
-        ptb_tag = 'SYM'
-    return ptb_tag
-
-
-def merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text, is_traverse):
-    # merge the text of the punct tok
-    if is_traverse:
-        merged_punct_sentence[last_merged_punct_index]["text"] = \
-            punct_text + merged_punct_sentence[last_merged_punct_index]["text"]
-    else:
-        merged_punct_sentence[last_merged_punct_index]["text"] = \
-            merged_punct_sentence[last_merged_punct_index]["text"] + punct_text
-
-
-def find_correct_index(orig_gov, merged_punct_sentence):
-    for tok_index, tok in enumerate(merged_punct_sentence):
-        if tok["start"] == orig_gov["start"] and tok["len"] == orig_gov["len"] and tok["pos"] == \
-                orig_gov["pos"] and tok["text"] == orig_gov["text"]:
-            return tok_index
-    return None
-
-
-def fix_gov_indexes(merged_punct_sentence, sentence):
-    for merged_token in merged_punct_sentence:
-        tok_gov = merged_token['gov']
-        if tok_gov == -1:  # gov is root
-            merged_token['gov'] = -1
-        else:
-            orig_gov = sentence[tok_gov]
-            correct_index = find_correct_index(orig_gov, merged_punct_sentence)
-            merged_token['gov'] = correct_index
-
-
-def merge_punctuation(sentence):
-    merged_punct_sentence = []
-    tmp_punct_text = None
-    punct_text = None
-    last_merged_punct_index = -1
-    for tok_index, token in enumerate(sentence):
-        if token['rel'] == 'punct':
-            punct_text = token["text"]
-            if tok_index < 1:  # this is the first tok - append to the next token
-                tmp_punct_text = punct_text
-            else:  # append to the previous token
-                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
-                                False)
-        else:
-            merged_punct_sentence.append(token)
-            last_merged_punct_index = last_merged_punct_index + 1
-            if tmp_punct_text is not None:
-                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
-                                True)
-                tmp_punct_text = None
-    return merged_punct_sentence
-
-
-def normalize(word):
-    return 'NUM' if NUMBER_REGEX.match(word) else word.lower()
 
 
 def vocab(conll_path):
@@ -1104,15 +663,6 @@ def read_conll(path):
                                    tok[7], tok[8], tok[9]))
         if len(tokens) > 1:
             yield tokens
-
-
-def write_conll(path, conll_gen):
-    """Writes CoNLL sentences to CoNLL formatted file."""
-    with open(path, 'w') as file:
-        for sentence in conll_gen:
-            for entry in sentence[1:]:
-                file.write(str(entry) + '\n')
-            file.write('\n')
 
 
 def run_eval(gold, test):
@@ -1626,49 +1176,6 @@ def run_conllu_eval(gold_file, test_file, weights_file=WEIGHTS, verbose=True):
                 ) + '\n')
 
 
-def validate(*args):
-    """
-    Validate all arguments are of correct type and in correct range.
-    Args:
-        *args (tuple of tuples): Each tuple represents an argument validation like so:
-        Option 1 - With range check:
-            (arg, class, min_val, max_val)
-        Option 2 - Without range check:
-            (arg, class)
-        If class is a tuple of type objects check if arg is an instance of any of the types.
-        To allow a None valued argument, include type(None) in class.
-        To disable lower or upper bound check, set min_val or max_val to None, respectively.
-        If arg has the len attribute (such as string), range checks are performed on its length.
-    """
-    for arg in args:
-        arg_val = arg[0]
-        arg_type = (arg[1],) if isinstance(arg[1], type) else arg[1]
-        if not isinstance(arg_val, arg_type):
-            raise TypeError('Expected type {}'.format(' or '.join([t.__name__ for t in arg_type])))
-        if arg_val is not None and len(arg) >= 4:
-            name = 'of ' + arg[4] if len(arg) == 5 else ''
-            arg_min = arg[2]
-            arg_max = arg[3]
-            if hasattr(arg_val, '__len__'):
-                val = 'Length'
-                num = len(arg_val)
-            else:
-                val = 'Value'
-                num = arg_val
-            if arg_min is not None and num < arg_min:
-                raise ValueError('{} {} must be greater or equal to {}'.format(val, name, arg_min))
-            if arg_max is not None and num >= arg_max:
-                raise ValueError('{} {} must be less than {}'.format(val, name, arg_max))
-
-
-def validate_existing_filepath(arg):
-    """Validates an input argument is a path string to an existing file."""
-    validate((arg, str, 0, 255))
-    if not os.path.isfile(arg):
-        raise ValueError("{0} does not exist.".format(arg))
-    return arg
-
-
 def download_unlicensed_file(url, sourcefile, destfile, totalsz=None):
     """
     Download the file specified by the given URL.
@@ -1727,6 +1234,525 @@ def uncompress_file(filepath, outpath='.'):
 INTENSIFIER_FACTOR = 0.3
 VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
 NUMBER_REGEX = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
+
+
+class CoreNLPDoc(object):
+    """Object for core-components (POS, Dependency Relations, etc).
+    Attributes:
+        _doc_text: the doc text
+        _sentences: list of sentences, each word in a sentence is
+            represented by a dictionary, structured as follows: {'start': (int), 'len': (int),
+            'pos': (str), 'ner': (str), 'lemma': (str), 'gov': (int), 'rel': (str)}
+    """
+    def __init__(self, doc_text: str = '', sentences: list = None):
+        if sentences is None:
+            sentences = []
+        self._doc_text = doc_text
+        self._sentences = sentences
+
+    @property
+    def doc_text(self):
+        return self._doc_text
+
+    @doc_text.setter
+    def doc_text(self, val):
+        self._doc_text = val
+
+    @property
+    def sentences(self):
+        return self._sentences
+
+    @sentences.setter
+    def sentences(self, val):
+        self._sentences = val
+
+    @staticmethod
+    def decoder(obj):
+        if '_doc_text' in obj and '_sentences' in obj:
+            return CoreNLPDoc(obj['_doc_text'], obj['_sentences'])
+        return obj
+
+    def __repr__(self):
+        return self.pretty_json()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __iter__(self):
+        return self.sentences.__iter__()
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def json(self):
+        """Returns json representations of the object."""
+        return json.dumps(self.__dict__)
+
+    def pretty_json(self):
+        """Returns pretty json representations of the object."""
+        return json.dumps(self.__dict__, indent=4)
+
+    def sent_text(self, i):
+        parsed_sent = self.sentences[i]
+        first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
+        return self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
+
+    def sent_iter(self):
+        for parsed_sent in self.sentences:
+            first_tok, last_tok = parsed_sent[0], parsed_sent[-1]
+            sent_text = self.doc_text[first_tok['start']: last_tok['start'] + last_tok['len']]
+            yield sent_text, parsed_sent
+
+    def brat_doc(self):
+        """Returns doc adapted to BRAT expected input."""
+        doc = {'text': '', 'entities': [], 'relations': []}
+        tok_count = 0
+        rel_count = 1
+        for sentence in self.sentences:
+            sentence_start = sentence[0]['start']
+            sentence_end = sentence[-1]['start'] + sentence[-1]['len']
+            doc['text'] = doc['text'] + '\n' + self.doc_text[sentence_start:sentence_end]
+            token_offset = tok_count
+
+            for token in sentence:
+                start = token['start']
+                end = start + token['len']
+                doc['entities'].append(['T' + str(tok_count), token['pos'], [[start, end]]])
+
+                if token['gov'] != -1 and token['rel'] != 'punct':
+                    doc['relations'].append(
+                        [rel_count, token['rel'], [['', 'T' + str(token_offset + token['gov'])],
+                                                   ['', 'T' + str(tok_count)]]])
+                    rel_count += 1
+                tok_count += 1
+        doc['text'] = doc['text'][1:]
+        return doc
+
+    def displacy_doc(self):
+        """Return doc adapted to displacyENT expected input."""
+        doc = []
+        for sentence in self.sentences:
+            sentence_doc = {'arcs': [], 'words': []}
+            # Merge punctuation:
+            merged_punct_sentence = merge_punctuation(sentence)
+            fix_gov_indexes(merged_punct_sentence, sentence)
+            for tok_index, token in enumerate(merged_punct_sentence):
+                sentence_doc['words'].append({'text': token['text'], 'tag': token['pos']})
+                dep_tok = tok_index
+                gov_tok = token['gov']
+                direction = 'left'
+                arc_start = dep_tok
+                arc_end = gov_tok
+                if dep_tok > gov_tok:
+                    direction = 'right'
+                    arc_start = gov_tok
+                    arc_end = dep_tok
+                if token['gov'] != -1 and token['rel'] != 'punct':
+                    sentence_doc['arcs'].append({'dir': direction, 'label': token['rel'],
+                                                 'start': arc_start, 'end': arc_end})
+            doc.append(sentence_doc)
+        return doc
+
+
+def merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text, is_traverse):
+    # merge the text of the punct tok
+    if is_traverse:
+        merged_punct_sentence[last_merged_punct_index]["text"] = \
+            punct_text + merged_punct_sentence[last_merged_punct_index]["text"]
+    else:
+        merged_punct_sentence[last_merged_punct_index]["text"] = \
+            merged_punct_sentence[last_merged_punct_index]["text"] + punct_text
+
+
+def find_correct_index(orig_gov, merged_punct_sentence):
+    for tok_index, tok in enumerate(merged_punct_sentence):
+        if tok["start"] == orig_gov["start"] and tok["len"] == orig_gov["len"] and tok["pos"] == \
+                orig_gov["pos"] and tok["text"] == orig_gov["text"]:
+            return tok_index
+    return None
+
+
+def fix_gov_indexes(merged_punct_sentence, sentence):
+    for merged_token in merged_punct_sentence:
+        tok_gov = merged_token['gov']
+        if tok_gov == -1:  # gov is root
+            merged_token['gov'] = -1
+        else:
+            orig_gov = sentence[tok_gov]
+            correct_index = find_correct_index(orig_gov, merged_punct_sentence)
+            merged_token['gov'] = correct_index
+
+
+def merge_punctuation(sentence):
+    merged_punct_sentence = []
+    tmp_punct_text = None
+    punct_text = None
+    last_merged_punct_index = -1
+    for tok_index, token in enumerate(sentence):
+        if token['rel'] == 'punct':
+            punct_text = token["text"]
+            if tok_index < 1:  # this is the first tok - append to the next token
+                tmp_punct_text = punct_text
+            else:  # append to the previous token
+                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
+                                False)
+        else:
+            merged_punct_sentence.append(token)
+            last_merged_punct_index = last_merged_punct_index + 1
+            if tmp_punct_text is not None:
+                merge_punct_tok(merged_punct_sentence, last_merged_punct_index, punct_text,
+                                True)
+                tmp_punct_text = None
+    return merged_punct_sentence
+
+
+def validate(*args):
+    """
+    Validate all arguments are of correct type and in correct range.
+    Args:
+        *args (tuple of tuples): Each tuple represents an argument validation like so:
+        Option 1 - With range check:
+            (arg, class, min_val, max_val)
+        Option 2 - Without range check:
+            (arg, class)
+        If class is a tuple of type objects check if arg is an instance of any of the types.
+        To allow a None valued argument, include type(None) in class.
+        To disable lower or upper bound check, set min_val or max_val to None, respectively.
+        If arg has the len attribute (such as string), range checks are performed on its length.
+    """
+    for arg in args:
+        arg_val = arg[0]
+        arg_type = (arg[1],) if isinstance(arg[1], type) else arg[1]
+        if not isinstance(arg_val, arg_type):
+            raise TypeError('Expected type {}'.format(' or '.join([t.__name__ for t in arg_type])))
+        if arg_val is not None and len(arg) >= 4:
+            name = 'of ' + arg[4] if len(arg) == 5 else ''
+            arg_min = arg[2]
+            arg_max = arg[3]
+            if hasattr(arg_val, '__len__'):
+                val = 'Length'
+                num = len(arg_val)
+            else:
+                val = 'Value'
+                num = arg_val
+            if arg_min is not None and num < arg_min:
+                raise ValueError('{} {} must be greater or equal to {}'.format(val, name, arg_min))
+            if arg_max is not None and num >= arg_max:
+                raise ValueError('{} {} must be less than {}'.format(val, name, arg_max))
+
+
+def validate_existing_filepath(arg):
+    """Validates an input argument is a path string to an existing file."""
+    validate((arg, str, 0, 255))
+    if not os.path.isfile(arg):
+        raise ValueError("{0} does not exist.".format(arg))
+    return arg
+
+
+def _spacy_pos_to_ptb(pos, text):
+    """
+    Converts a Spacy part-of-speech tag to a Penn Treebank part-of-speech tag.
+    Args:
+        pos (str): Spacy POS tag.
+        text (str): The token text.
+    Returns:
+        ptb_tag (str): Standard PTB POS tag.
+    """
+    validate((pos, str, 0, 30), (text, str, 0, 1000))
+    ptb_tag = pos
+    if text in ['...', '—']:
+        ptb_tag = ':'
+    elif text == '*':
+        ptb_tag = 'SYM'
+    elif pos == 'AFX':
+        ptb_tag = 'JJ'
+    elif pos == 'ADD':
+        ptb_tag = 'NN'
+    elif text != pos and text in [',', '.', ":", '``', '-RRB-', '-LRB-']:
+        ptb_tag = text
+    elif pos in ['NFP', 'HYPH', 'XX']:
+        ptb_tag = 'SYM'
+    return ptb_tag
+
+
+def normalize(word):
+    return 'NUM' if NUMBER_REGEX.match(word) else word.lower()
+
+
+class ConllEntry:
+    def __init__(self, eid, form, lemma, pos, cpos, feats=None, parent_id=None, relation=None,
+                 deps=None, misc=None):
+        self.id = eid
+        self.form = form
+        self.norm = normalize(form)
+        self.cpos = cpos.upper()
+        self.pos = pos.upper()
+        self.parent_id = parent_id
+        self.relation = relation
+
+        self.lemma = lemma
+        self.feats = feats
+        self.deps = deps
+        self.misc = misc
+
+        self.pred_parent_id = None
+        self.pred_relation = None
+
+        self.vec = None
+        self.lstms = None
+
+    def __str__(self):
+        values = [str(self.id), self.form, self.lemma, self.cpos, self.pos, self.feats,
+                  str(self.pred_parent_id) if self.pred_parent_id is not None else None,
+                  self.pred_relation, self.deps, self.misc]
+        return '\t'.join(['_' if v is None else v for v in values])
+
+
+def get_options_dict(activation, lstm_dims, lstm_layers, pos_dims):
+    """Generates dictionary with all parser options."""
+    return {'activation': activation, 'lstm_dims': lstm_dims, 'lstm_layers': lstm_layers,
+            'pembedding_dims': pos_dims, 'wembedding_dims': 100, 'rembedding_dims': 25,
+            'hidden_units': 100, 'hidden2_units': 0, 'learning_rate': 0.1, 'blstmFlag': True,
+            'labelsFlag': True, 'bibiFlag': True, 'costaugFlag': True, 'seed': 0, 'mem': 0}
+
+
+class SpacyInstance:
+    """
+    Spacy pipeline wrapper which prompts user for model download authorization.
+    Args:
+        model (str, optional): spacy model name (default: english small model)
+        disable (list of string, optional): pipeline annotators to disable
+            (default: [])
+        display_prompt (bool, optional): flag to display/skip license prompt
+    """
+
+    def __init__(self, model='en', disable=None, display_prompt=True):
+        self._parser = spacy.load(model, disable=disable)
+
+    @property
+    def parser(self):
+        """return Spacy's instance parser"""
+        return self._parser
+
+    def tokenize(self, text: str) -> List[str]:
+        """
+        Tokenize a sentence into tokens
+        Args:
+            text (str): text to tokenize
+        Returns:
+            list: a list of str tokens of input
+        """
+        # pylint: disable=not-callable
+
+        return [t.text for t in self.parser(text)]
+
+
+class BISTModel(object):
+    """
+    BIST parser model class.
+    This class handles training, prediction, loading and saving of a BIST parser model.
+    After the model is initialized, it accepts a CoNLL formatted dataset as input, and learns to
+    output dependencies for new input.
+    Args:
+        activation (str, optional): Activation function to use.
+        lstm_layers (int, optional): Number of LSTM layers to use.
+        lstm_dims (int, optional): Number of LSTM dimensions to use.
+        pos_dims (int, optional): Number of part-of-speech embedding dimensions to use.
+    Attributes:
+        model (MSTParserLSTM): The underlying LSTM model.
+        params (tuple): Additional parameters and resources for the model.
+        options (dict): User model options.
+    """
+
+    def __init__(self, activation='tanh', lstm_layers=2, lstm_dims=125, pos_dims=25):
+        validate((activation, str), (lstm_layers, int, 0, None), (lstm_dims, int, 0, 1000),
+                 (pos_dims, int, 0, 1000))
+        self.options = get_options_dict(activation, lstm_dims, lstm_layers, pos_dims)
+        self.params = None
+        self.model = None
+
+    def fit(self, dataset, epochs=10, dev=None):
+        """
+        Trains a BIST model on an annotated dataset in CoNLL file format.
+        Args:
+            dataset (str): Path to input dataset for training, formatted in CoNLL/U format.
+            epochs (int, optional): Number of learning iterations.
+            dev (str, optional): Path to development dataset for conducting evaluations.
+        """
+        if dev:
+            dev = validate_existing_filepath(dev)
+        dataset = validate_existing_filepath(dataset)
+        validate((epochs, int, 0, None))
+
+        print('\nRunning fit on ' + dataset + '...\n')
+        words, w2i, pos, rels = vocab(dataset)
+        self.params = words, w2i, pos, rels, self.options
+
+        from nlp_architect.models.bist.mstlstm import MSTParserLSTM
+        self.model = MSTParserLSTM(*self.params)
+
+        for epoch in range(epochs):
+            print('Starting epoch', epoch + 1)
+            self.model.train(dataset)
+            if dev:
+                ext = dev.rindex('.')
+                res_path = dev[:ext] + '_epoch_' + str(epoch + 1) + '_pred' + dev[ext:]
+                write_conll(res_path, self.model.predict(dev))
+                run_eval(dev, res_path)  # needed?
+
+    def predict(self, dataset, evaluate=False):
+        """
+        Runs inference with the BIST model on a dataset in CoNLL file format.
+        Args:
+            dataset (str): Path to input CoNLL file.
+            evaluate (bool, optional): Write prediction and evaluation files to dataset's folder.
+        Returns:
+            res (list of list of ConllEntry): The list of input sentences with predicted
+            dependencies attached.
+        """
+        dataset = validate_existing_filepath(dataset)
+        validate((evaluate, bool))
+
+        print('\nRunning predict on ' + dataset + '...\n')
+        res = list(self.model.predict(conll_path=dataset))
+        # if evaluate:
+        #     ext = dataset.rindex('.')
+        #     pred_path = dataset[:ext] + '_pred' + dataset[ext:]
+        #     write_conll(pred_path, res)
+        #     run_eval(dataset, pred_path)
+        return res
+
+    def predict_conll(self, dataset):
+        """
+        Runs inference with the BIST model on a dataset in CoNLL object format.
+        Args:
+            dataset (list of list of ConllEntry): Input in the form of ConllEntry objects.
+        Returns:
+            res (list of list of ConllEntry): The list of input sentences with predicted
+            dependencies attached.
+        """
+        res = None
+        if hasattr(dataset, '__iter__'):
+            res = list(self.model.predict(conll=dataset))
+        return res
+
+    def load(self, path):
+        """Loads and initializes a BIST model from file."""
+        with open(path.parent / 'params.json') as file:
+            self.params = json.load(file)
+
+        from nlp_architect.models.bist.mstlstm import MSTParserLSTM  # TODO
+        self.model = MSTParserLSTM(*self.params)  # TODO
+        self.model.model.populate(str(path))  # TODO
+
+    def save(self, path):
+        """Saves the BIST model to file."""
+        print("Saving")
+        with open(os.path.join(os.path.dirname(path), 'params.json'), 'w') as file:
+            json.dump(self.params, file)
+        self.model.model.save(path)
+
+
+class SpacyBISTParser(object):
+    """Main class which handles parsing with Spacy-BIST parser.
+    Args:
+        verbose (bool, optional): Controls output verbosity.
+        spacy_model (str, optional): Spacy model to use
+        (see https://spacy.io/api/top-level#spacy.load).
+        bist_model (str, optional): Path to a .model file to load. Defaults pre-trained model'.
+    """
+
+    def __init__(self, verbose=False, spacy_model='en', bist_model='bist.model'):
+        validate((verbose, bool), (spacy_model, str, 0, 1000),
+                 (bist_model, (type(None), str), 0, 1000))
+
+        self.verbose = verbose
+        self.bist_parser = BISTModel()
+        self.bist_parser.load(bist_model)  # TODO
+        self.spacy_parser = SpacyInstance(spacy_model,
+                                          disable=['ner', 'vectors', 'textcat']).parser
+
+    def to_conll(self, doc_text):
+        """Converts a document to CoNLL format with spacy POS tags.
+        Args:
+            doc_text (str): raw document text.
+        Yields:
+            list of ConllEntry: The next sentence in the document in CoNLL format.
+        """
+        validate((doc_text, str))
+        for sentence in self.spacy_parser(doc_text).sents:
+            sentence_conll = [ConllEntry(0, '*root*', '*root*', 'ROOT-POS', 'ROOT-CPOS', '_',
+                                         -1, 'rroot', '_', '_')]
+            i_tok = 0
+            for tok in sentence:
+                if self.verbose:
+                    print(tok.text + '\t' + tok.tag_)
+
+                if not tok.is_space:
+                    pos = tok.tag_
+                    text = tok.text
+
+                    if text != '-' or pos != 'HYPH':
+                        pos = _spacy_pos_to_ptb(pos, text)
+                        token_conll = ConllEntry(i_tok + 1, text, tok.lemma_, pos, pos,
+                                                 tok.ent_type_, -1, '_', '_', tok.idx)
+                        sentence_conll.append(token_conll)
+                        i_tok += 1
+
+            if self.verbose:
+                print('-----------------------\ninput conll form:')
+                for entry in sentence_conll:
+                    print(str(entry.id) + '\t' + entry.form + '\t' + entry.pos + '\t')
+            yield sentence_conll
+
+    def parse(self, doc_text, show_tok=True, show_doc=True):
+        """Parse a raw text document.
+        Args:
+            doc_text (str)
+            show_tok (bool, optional): Specifies whether to include token text in output.
+            show_doc (bool, optional): Specifies whether to include document text in output.
+        Returns:
+            CoreNLPDoc: The annotated document.
+        """
+        validate((doc_text, str), (show_tok, bool), (show_doc, bool))
+        doc_conll = self.to_conll(doc_text)
+        parsed_doc = CoreNLPDoc()
+
+        if show_doc:
+            parsed_doc.doc_text = doc_text
+
+        for sent_conll in self.bist_parser.predict_conll(doc_conll):
+            parsed_sent = []
+            conj_governors = {'and': set(), 'or': set()}
+
+            for tok in sent_conll:
+                gov_id = int(tok.pred_parent_id)
+                rel = tok.pred_relation
+
+                if tok.form != '*root*':
+                    if tok.form.lower() == 'and':
+                        conj_governors['and'].add(gov_id)
+                    if tok.form.lower() == 'or':
+                        conj_governors['or'].add(gov_id)
+
+                    if rel == 'conj':
+                        if gov_id in conj_governors['and']:
+                            rel += '_and'
+                        if gov_id in conj_governors['or']:
+                            rel += '_or'
+
+                    parsed_tok = {'start': tok.misc, 'len': len(tok.form),
+                                  'pos': tok.pos, 'ner': tok.feats,
+                                  'lemma': tok.lemma, 'gov': gov_id - 1,
+                                  'rel': rel}
+
+                    if show_tok:
+                        parsed_tok['text'] = tok.form
+                    parsed_sent.append(parsed_tok)
+            if parsed_sent:
+                parsed_doc.sentences.append(parsed_sent)
+        return parsed_doc
+
 
 def _read_lexicon_from_csv(lexicon_path: Union[str, PathLike]) -> dict:
     """Read a lexicon from a CSV file.
@@ -1798,7 +1824,7 @@ class SentimentInference(object):
         self.opinion_lex = _load_opinion_lex(opinion_lex)  # have this as hardcoded like below?
         self.intensifier_lex = _read_lexicon_from_csv('IntensifiersLex.csv')
         self.negation_lex = _read_lexicon_from_csv('NegationSentLex.csv')
-        self.parser = None  # necessary?
+        self.parser = None  # needed?
 
     def run(self, doc: str = None, parsed_doc: CoreNLPDoc = None) -> SentimentDoc:
         """Run SentimentInference on a single document.
@@ -1871,7 +1897,7 @@ class SentimentInference(object):
         """Extract opinion and aspect terms from sentence."""
         event = []
         sent_aspect_pair = None
-        real_aspect_indices = _consolidate_aspects(aspect_row.term, parsed_sentence)
+        real_aspect_indices = _consolidate_aspects(aspect_row.term, parsed_sentence)  # TODO
         aspect_key = aspect_row.term[0]
         for aspect_index_range in real_aspect_indices:
             for word_index in aspect_index_range:
@@ -1976,10 +2002,10 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     inference = SentimentInference(aspect_lex, opinion_lex, parse=False)
 
     # source data is raw text, need to parse
-    # parse = SpacyBISTParser().parse
+    parse = SpacyBISTParser(bist_model='/Users/Smith-Box/nlp-architect/cache/bist-pretrained/').parse
 
     # run inference on the data
-    # parsed_doc = parse(doc)  # but do this with preprocessing?
+    parsed_doc = parse(doc)  # but do this as preprocessing?
 
     # sentiment_doc = inference.run(parsed_doc=parsed_doc)
     sentiment_doc = {'aspects': aspect_lex,
