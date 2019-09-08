@@ -23,6 +23,922 @@ import spacy
 import requests
 from tqdm import tqdm
 
+
+################################## Not needed? ##################################
+
+# DONE # from nlp_architect.common.core_nlp_doc import CoreNLPDoc
+# DONE # from nlp_architect.data.conll import ConllEntry
+# DONE # from nlp_architect.models.bist_parser import BISTModel
+# DONE # from nlp_architect.models.bist import utils (.vocab .write_conll .run_eval)
+# DONE # from nlp_architect.models.bist.utils import get_options_dict
+# DONE # from nlp_architect.models.bist.eval.conllu.conll17_ud_eval import run_conllu_eval
+# DONE # from nlp_architect.utils.io import validate, validate_existing_filepath
+# DONE # from nlp_architect import LIBRARY_OUT
+# DONE # from nlp_architect.utils.io import download_unlicensed_file, uncompress_file
+# DONE # from nlp_architect.utils.io import validate
+# from nlp_architect.utils.text import SpacyInstance
+
+
+# class Vocabulary:
+#     """
+#     A vocabulary that maps words to ints (storing a vocabulary)
+#     """
+#
+#     def __init__(self, start=0):
+#
+#         self._vocab = {}
+#         self._rev_vocab = {}
+#         self.next = start
+#
+#     def add(self, word):
+#         """
+#         Add word to vocabulary
+#         Args:
+#             word (str): word to add
+#         Returns:
+#             int: id of added word
+#         """
+#         if word not in self._vocab.keys():
+#             self._vocab[word] = self.next
+#             self._rev_vocab[self.next] = word
+#             self.next += 1
+#         return self._vocab.get(word)
+#
+#     def word_id(self, word):
+#         """
+#         Get the word_id of given word
+#         Args:
+#             word (str): word from vocabulary
+#         Returns:
+#             int: int id of word
+#         """
+#         return self._vocab.get(word, None)
+#
+#     def __getitem__(self, item):
+#         """
+#         Get the word_id of given word (same as `word_id`)
+#         """
+#         return self.word_id(item)
+#
+#     def __len__(self):
+#         return len(self._vocab)
+#
+#     def __iter__(self):
+#         for word in self.vocab.keys():
+#             yield word
+#
+#     @property
+#     def max(self):
+#         return self.next
+#
+#     def id_to_word(self, wid):
+#         """
+#         Word-id to word (string)
+#         Args:
+#             wid (int): word id
+#         Returns:
+#             str: string of given word id
+#         """
+#         return self._rev_vocab.get(wid)
+#
+#     @property
+#     def vocab(self):
+#         """
+#         dict: get the dict object of the vocabulary
+#         """
+#         return self._vocab
+#
+#     def add_vocab_offset(self, offset):
+#         """
+#         Adds an offset to the ints of the vocabulary
+#         Args:
+#             offset (int): an int offset
+#         """
+#         new_vocab = {}
+#         for k, v in self.vocab.items():
+#             new_vocab[k] = v + offset
+#         self.next += offset
+#         self._vocab = new_vocab
+#         self._rev_vocab = {v: k for k, v in new_vocab.items()}
+#
+#     def reverse_vocab(self):
+#         """
+#         Return the vocabulary as a reversed dict object
+#         Returns:
+#             dict: reversed vocabulary object
+#         """
+#         return self._rev_vocab
+
+
+# def try_to_load_spacy(model_name):
+#     try:
+#         spacy.load(model_name)
+#         return True
+#     except OSError:
+#         return False
+
+
+# stemmer = EnglishStemmer()
+# lemmatizer = WordNetLemmatizer()
+# spacy_lemmatizer = Lemmatizer(LEMMA_INDEX, LEMMA_EXC, LEMMA_RULES)
+# p = re.compile(r'[ \-,;.@&_]')
+
+
+# class Stopwords(object):
+#     """
+#     Stop words list class.
+#     """
+#     stop_words = []
+#
+#     @staticmethod
+#     def get_words():
+#         if not Stopwords.stop_words:
+#             sw_path = path.join(path.dirname(path.realpath(__file__)),
+#                                 'resources',
+#                                 'stopwords.txt')
+#             with open(sw_path) as fp:
+#                 stop_words = []
+#                 for w in fp:
+#                     stop_words.append(w.strip().lower())
+#             Stopwords.stop_words = stop_words
+#         return Stopwords.stop_words
+
+
+# def simple_normalizer(text):
+#     """
+#     Simple text normalizer. Runs each token of a phrase thru wordnet lemmatizer
+#     and a stemmer.
+#     """
+#     if not str(text).isupper() or \
+#             not str(text).endswith('S') or \
+#             not len(text.split()) == 1:
+#         tokens = list(filter(lambda x: len(x) != 0, p.split(text.strip())))
+#         text = ' '.join([stemmer.stem(lemmatizer.lemmatize(t))
+#                          for t in tokens])
+#     return text
+
+
+# def spacy_normalizer(text, lemma=None):
+#     """
+#     Simple text normalizer using spacy lemmatizer. Runs each token of a phrase
+#     thru a lemmatizer and a stemmer.
+#     Arguments:
+#         text(string): the text to normalize.
+#         lemma(string): lemma of the given text. in this case only stemmer will
+#         run.
+#     """
+#     if not str(text).isupper() or \
+#             not str(text).endswith('S') or \
+#             not len(text.split()) == 1:
+#         tokens = list(filter(lambda x: len(x) != 0, p.split(text.strip())))
+#         if lemma:
+#             lemma = lemma.split(' ')
+#             text = ' '.join([stemmer.stem(l)
+#                              for l in lemma])
+#         else:
+#             text = ' '.join([stemmer.stem(spacy_lemmatizer(t, u'NOUN')[0])
+#                              for t in tokens])
+#     return text
+
+
+# def read_sequential_tagging_file(file_path, ignore_line_patterns=None):
+#     """
+#     Read a tab separated sequential tagging file.
+#     Returns a list of list of tuple of tags (sentences, words)
+#     Args:
+#         file_path (str): input file path
+#         ignore_line_patterns (list, optional): list of string patterns to ignore
+#     Returns:
+#         list of list of tuples
+#     """
+#     if ignore_line_patterns:
+#         assert isinstance(ignore_line_patterns, list), 'ignore_line_patterns must be a list'
+#
+#     def _split_into_sentences(file_lines):
+#         sentences = []
+#         s = []
+#         for line in file_lines:
+#             if len(line) == 0:
+#                 sentences.append(s)
+#                 s = []
+#                 continue
+#             s.append(line)
+#         if len(s) > 0:
+#             sentences.append(s)
+#         return sentences
+#
+#     with open(file_path, encoding='utf-8') as fp:
+#         data = fp.readlines()
+#         data = [d.strip() for d in data]
+#         if ignore_line_patterns:
+#             for s in ignore_line_patterns:
+#                 data = [d for d in data if s not in d]
+#         data = [tuple(d.split()) for d in data]
+#     return _split_into_sentences(data)
+
+
+# def word_vector_generator(data, lower=False, start=0):
+#     """
+#     Word vector generator util.
+#     Transforms a list of sentences into numpy int vectors and returns the
+#     constructed vocabulary
+#     Arguments:
+#         data (list): list of list of strings
+#         lower (bool, optional): transform strings into lower case
+#         start (int, optional): vocabulary index start integer
+#     Returns:
+#         2D numpy array and Vocabulary of the detected words
+#     """
+#     vocab = Vocabulary(start)
+#     data_vec = []
+#     for sentence in data:
+#         sentence_vec = []
+#         for w in sentence:
+#             word = w
+#             if lower:
+#                 word = word.lower()
+#             wid = vocab[word]
+#             if wid is None:
+#                 wid = vocab.add(word)
+#             sentence_vec.append(wid)
+#         data_vec.append(sentence_vec)
+#     return data_vec, vocab
+
+
+# def character_vector_generator(data, start=0):
+#     """
+#     Character word vector generator util.
+#     Transforms a list of sentences into numpy int vectors of the characters
+#     of the words of the sentence, and returns the constructed vocabulary
+#     Arguments:
+#         data (list): list of list of strings
+#         start (int, optional): vocabulary index start integer
+#     Returns:
+#         np.array: a 2D numpy array
+#         Vocabulary: constructed vocabulary
+#     """
+#     vocab = Vocabulary(start)
+#     data_vec = []
+#     for sentence in data:
+#         sentence_vec = []
+#         for w in sentence:
+#             word_vec = []
+#             for char in w:
+#                 cid = vocab[char]
+#                 if cid is None:
+#                     cid = vocab.add(char)
+#                 word_vec.append(cid)
+#             sentence_vec.append(word_vec)
+#         data_vec.append(sentence_vec)
+#     return data_vec, vocab
+
+
+# def extract_nps(annotation_list, text=None):
+#     """
+#     Extract Noun Phrases from given text tokens and phrase annotations.
+#     Returns a list of tuples with start/end indexes.
+#     Args:
+#         annotation_list (list): a list of annotation tags in str
+#         text (list, optional): a list of token texts in str
+#     Returns:
+#         list of start/end markers of noun phrases, if text is provided a list of noun phrase texts
+#     """
+#     np_starts = [i for i in range(len(annotation_list)) if annotation_list[i] == 'B-NP']
+#     np_markers = []
+#     for s in np_starts:
+#         i = 1
+#         while s + i < len(annotation_list) and annotation_list[s + i] == 'I-NP':
+#             i += 1
+#         np_markers.append((s, s + i))
+#     return_markers = np_markers
+#     if text:
+#         assert len(text) == len(annotation_list), 'annotations/text length mismatch'
+#         return_markers = [' '.join(text[s:e]) for s, e in np_markers]
+#     return return_markers
+
+
+# def bio_to_spans(text: List[str], tags: List[str]) -> List[Tuple[int, int, str]]:
+#     """
+#     Convert BIO tagged list of strings into span starts and ends
+#     Args:
+#         text: list of words
+#         tags: list of tags
+#     Returns:
+#         tuple: list of start, end and tag of detected spans
+#     """
+#     pointer = 0
+#     starts = []
+#     for i, t, in enumerate(tags):
+#         if t.startswith('B-'):
+#             starts.append((i, pointer))
+#         pointer += len(text[i]) + 1
+#
+#     spans = []
+#     for s_i, s_char in starts:
+#         label_str = tags[s_i][2:]
+#         e = 0
+#         e_char = len(text[s_i + e])
+#         while len(tags) > s_i + e + 1 and tags[s_i + e + 1].startswith('I-'):
+#             e += 1
+#             e_char += 1 + len(text[s_i + e])
+#         spans.append((s_char, s_char + e_char, label_str))
+#     return spans
+
+
+# def _download_pretrained_model():
+#     """Downloads the pre-trained BIST model if non-existent."""
+#     if not path.isfile(SpacyBISTParser.dir / 'bist.model'):
+#         print('Downloading pre-trained BIST model...')
+#         zip_path = SpacyBISTParser.dir / 'bist-pretrained.zip'
+#         makedirs(SpacyBISTParser.dir, exist_ok=True)
+#         download_unlicensed_file(
+#             'https://s3-us-west-2.amazonaws.com/nlp-architect-data/models/dep_parse/',
+#             'bist-pretrained.zip', zip_path)
+#         print('Unzipping...')
+#         uncompress_file(zip_path, outpath=str(SpacyBISTParser.dir))
+#         remove(zip_path)
+#         print('Done.')
+
+
+# def vocab(conll_path):
+#     # pylint: disable=missing-docstring
+#     words_count = Counter()
+#     pos_count = Counter()
+#     rel_count = Counter()
+#
+#     for sentence in read_conll(conll_path):
+#         words_count.update([node.norm for node in sentence if isinstance(node, ConllEntry)])
+#         pos_count.update([node.pos for node in sentence if isinstance(node, ConllEntry)])
+#         rel_count.update([node.relation for node in sentence if isinstance(node, ConllEntry)])
+#
+#     return words_count, {w: i for i, w in enumerate(words_count.keys())}, list(
+#         pos_count.keys()), list(rel_count.keys())
+
+
+# def run_eval(gold, test):
+#     """Evaluates a set of predictions using the appropriate script."""
+#     if is_conllu(gold):
+#         run_conllu_eval(gold_file=gold, test_file=test)
+#     else:
+#         eval_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'eval', 'eval.pl')
+#         with open(test[:test.rindex('.')] + '_eval.txt', 'w') as out_file:
+#             subprocess.run(['perl', eval_script, '-g', gold, '-s', test], stdout=out_file)
+
+
+# def is_conllu(path):
+#     """Determines if the file is in CoNLL-U format."""
+#     return os.path.splitext(path.lower())[1] == '.conllu'
+
+
+# def get_options_dict(activation, lstm_dims, lstm_layers, pos_dims):
+#     """Generates dictionary with all parser options."""
+#     return {'activation': activation, 'lstm_dims': lstm_dims, 'lstm_layers': lstm_layers,
+#             'pembedding_dims': pos_dims, 'wembedding_dims': 100, 'rembedding_dims': 25,
+#             'hidden_units': 100, 'hidden2_units': 0, 'learning_rate': 0.1, 'blstmFlag': True,
+#             'labelsFlag': True, 'bibiFlag': True, 'costaugFlag': True, 'seed': 0, 'mem': 0}
+
+
+# CoNLL-U column names
+# ID, FORM, LEMMA, UPOS, XPOS, FEATS, HEAD, DEPREL, DEPS, MISC = list(range(10))
+
+# WEIGHTS = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'weights.clas')
+
+# UD Error is used when raising exceptions in this module
+# class UDError(Exception):
+#     pass
+
+
+# Load given CoNLL-U file into internal representation
+# def load_conllu(file):
+#     # pylint: disable=too-many-locals
+#     # pylint: disable=too-many-branches
+#     # pylint: disable=too-many-statements
+#
+#     # Internal representation classes
+#     class UDRepresentation:
+#         # pylint: disable=too-few-public-methods
+#         def __init__(self):
+#             # Characters of all the tokens in the whole file.
+#             # Whitespace between tokens is not included.
+#             self.characters = []
+#             # List of UDSpan instances with start&end indices into `characters`
+#             self.tokens = []
+#             # List of UDWord instances.
+#             self.words = []
+#             # List of UDSpan instances with start&end indices into `characters`
+#             self.sentences = []
+#
+#     class UDSpan:
+#         # pylint: disable=too-few-public-methods
+#         def __init__(self, start, end):
+#             self.start = start
+#             # Note that self.end marks the first position **after the end** of
+#             # span, so we can use characters[start:end] or range(start, end).
+#             self.end = end
+#
+#     class UDWord:
+#         # pylint: disable=too-few-public-methods
+#         def __init__(self, span, columns, is_multiword):
+#             # Span of this word (or MWT, see below) within
+#             # ud_representation.characters.
+#             self.span = span
+#             # 10 columns of the CoNLL-U file: ID, FORM, LEMMA,...
+#             self.columns = columns
+#             # is_multiword==True means that this word is part of a multi-word
+#             # token.
+#             # In that case, self.span marks the span of the whole multi-word
+#             # token.
+#             self.is_multiword = is_multiword
+#             # Reference to the UDWord instance representing the HEAD (or None
+#             # if root).
+#             self.parent = None
+#             # Let's ignore language-specific deprel subtypes.
+#             self.columns[DEPREL] = columns[DEPREL].split(':')[0]
+#
+#     ud = UDRepresentation()
+#
+#     # Load the CoNLL-U file
+#     index, sentence_start = 0, None
+#     while True:
+#         line = file.readline()
+#         if not line:
+#             break
+#         line = line.rstrip("\r\n")
+#
+#         # Handle sentence start boundaries
+#         if sentence_start is None:
+#             # Skip comments
+#             if line.startswith("#"):
+#                 continue
+#             # Start a new sentence
+#             ud.sentences.append(UDSpan(index, 0))
+#             sentence_start = len(ud.words)
+#         if not line:
+#             # Add parent UDWord links and check there are no cycles
+#             def process_word(word):
+#                 if word.parent == "remapping":
+#                     raise UDError("There is a cycle in a sentence")
+#                 if word.parent is None:
+#                     head = int(word.columns[HEAD])
+#                     if head > len(ud.words) - sentence_start:
+#                         raise UDError(
+#                             "HEAD '{}' points outside of the sentence".format(
+#                                 word.columns[HEAD]))
+#                     if head:
+#                         parent = ud.words[sentence_start + head - 1]
+#                         word.parent = "remapping"
+#                         process_word(parent)
+#                         word.parent = parent
+#
+#             for word in ud.words[sentence_start:]:
+#                 process_word(word)
+#
+#             # Check there is a single root node
+#             if len([word for word in ud.words[sentence_start:] if
+#                     word.parent is None]) != 1:
+#                 raise UDError("There are multiple roots in a sentence")
+#
+#             # End the sentence
+#             ud.sentences[-1].end = index
+#             sentence_start = None
+#             continue
+#
+#         # Read next token/word
+#         columns = line.split("\t")
+#         if len(columns) != 10:
+#             raise UDError(
+#                 "The CoNLL-U line does not contain 10 tab-separated columns: "
+#                 "'{}'".format(line))
+#
+#         # Skip empty nodes
+#         if "." in columns[ID]:
+#             continue
+#
+#         # Delete spaces from FORM  so gold.characters == system.characters
+#         # even if one of them tokenizes the space.
+#         columns[FORM] = columns[FORM].replace(" ", "")
+#         if not columns[FORM]:
+#             raise UDError("There is an empty FORM in the CoNLL-U file")
+#
+#         # Save token
+#         ud.characters.extend(columns[FORM])
+#         ud.tokens.append(UDSpan(index, index + len(columns[FORM])))
+#         index += len(columns[FORM])
+#
+#         # Handle multi-word tokens to save word(s)
+#         if "-" in columns[ID]:
+#             try:
+#                 start, end = list(map(int, columns[ID].split("-")))
+#             except Exception:
+#                 raise UDError("Cannot parse multi-word token ID '{}'".format(
+#                     columns[ID]))
+#
+#             for _ in range(start, end + 1):
+#                 word_line = file.readline().rstrip("\r\n")
+#                 word_columns = word_line.split("\t")
+#                 if len(word_columns) != 10:
+#                     raise UDError(
+#                         "The CoNLL-U line does not contain 10 tab-separated "
+#                         "columns: '{}'".format(word_line))
+#                 ud.words.append(
+#                     UDWord(ud.tokens[-1], word_columns, is_multiword=True))
+#         # Basic tokens/words
+#         else:
+#             try:
+#                 word_id = int(columns[ID])
+#             except Exception:
+#                 raise UDError("Cannot parse word ID '{}'".format(columns[ID]))
+#             if word_id != len(ud.words) - sentence_start + 1:
+#                 raise UDError("Incorrect word ID '{}' for word '{}', expected"
+#                               " '{}'".format(columns[ID], columns[FORM],
+#                                              len(ud.words)
+#                                              - sentence_start + 1))
+#
+#             try:
+#                 head_id = int(columns[HEAD])
+#             except Exception:
+#                 raise UDError("Cannot parse HEAD '{}'".format(columns[HEAD]))
+#             if head_id < 0:
+#                 raise UDError("HEAD cannot be negative")
+#
+#             ud.words.append(UDWord(ud.tokens[-1], columns, is_multiword=False))
+#
+#     if sentence_start is not None:
+#         raise UDError("The CoNLL-U file does not end with empty line")
+#
+#     return ud
+
+
+# Evaluate the gold and system treebanks (loaded using load_conllu).
+# def evaluate(gold_ud, system_ud, deprel_weights=None):
+#     # pylint: disable=too-many-locals
+#     class Score:
+#         # pylint: disable=too-few-public-methods
+#         def __init__(self, gold_total, system_total, correct,
+#                      aligned_total=None):
+#             self.precision = correct / system_total if system_total else 0.0
+#             self.recall = correct / gold_total if gold_total else 0.0
+#             self.f1 = 2 * correct / (system_total + gold_total) \
+#                 if system_total + gold_total else 0.0
+#             self.aligned_accuracy = \
+#                 correct / aligned_total if aligned_total else aligned_total
+#
+#     class AlignmentWord:
+#         # pylint: disable=too-few-public-methods
+#         def __init__(self, gold_word, system_word):
+#             self.gold_word = gold_word
+#             self.system_word = system_word
+#             self.gold_parent = None
+#             self.system_parent_gold_aligned = None
+#
+#     class Alignment:
+#         def __init__(self, gold_words, system_words):
+#             self.gold_words = gold_words
+#             self.system_words = system_words
+#             self.matched_words = []
+#             self.matched_words_map = {}
+#
+#         def append_aligned_words(self, gold_word, system_word):
+#             self.matched_words.append(AlignmentWord(gold_word, system_word))
+#             self.matched_words_map[system_word] = gold_word
+#
+#         def fill_parents(self):
+#             # We represent root parents in both gold and system data by '0'.
+#             # For gold data, we represent non-root parent by corresponding gold
+#             # word.
+#             # For system data, we represent non-root parent by either gold word
+#             # aligned
+#             # to parent system nodes, or by None if no gold words is aligned to
+#             # the parent.
+#             for words in self.matched_words:
+#                 words.gold_parent = words.gold_word.parent if \
+#                     words.gold_word.parent is not None else 0
+#                 words.system_parent_gold_aligned = self.matched_words_map.get(
+#                     words.system_word.parent, None) \
+#                     if words.system_word.parent is not None else 0
+#
+#     def lower(text):
+#         if sys.version_info < (3, 0) and isinstance(text, str):
+#             return text.decode("utf-8").lower()
+#         return text.lower()
+#
+#     def spans_score(gold_spans, system_spans):
+#         correct, gi, si = 0, 0, 0
+#         while gi < len(gold_spans) and si < len(system_spans):
+#             if system_spans[si].start < gold_spans[gi].start:
+#                 si += 1
+#             elif gold_spans[gi].start < system_spans[si].start:
+#                 gi += 1
+#             else:
+#                 correct += gold_spans[gi].end == system_spans[si].end
+#                 si += 1
+#                 gi += 1
+#
+#         return Score(len(gold_spans), len(system_spans), correct)
+#
+#     def alignment_score(alignment, key_fn, weight_fn=lambda w: 1):
+#         gold, system, aligned, correct = 0, 0, 0, 0
+#
+#         for word in alignment.gold_words:
+#             gold += weight_fn(word)
+#
+#         for word in alignment.system_words:
+#             system += weight_fn(word)
+#
+#         for words in alignment.matched_words:
+#             aligned += weight_fn(words.gold_word)
+#
+#         if key_fn is None:
+#             # Return score for whole aligned words
+#             return Score(gold, system, aligned)
+#
+#         for words in alignment.matched_words:
+#             if key_fn(words.gold_word, words.gold_parent) == key_fn(
+#                     words.system_word,
+#                     words.system_parent_gold_aligned):
+#                 correct += weight_fn(words.gold_word)
+#
+#         return Score(gold, system, correct, aligned)
+#
+#     def beyond_end(words, i, multiword_span_end):
+#         if i >= len(words):
+#             return True
+#         if words[i].is_multiword:
+#             return words[i].span.start >= multiword_span_end
+#         return words[i].span.end > multiword_span_end
+#
+#     def extend_end(word, multiword_span_end):
+#         if word.is_multiword and word.span.end > multiword_span_end:
+#             return word.span.end
+#         return multiword_span_end
+#
+#     def find_multiword_span(gold_words, system_words, gi, si):
+#         # We know gold_words[gi].is_multiword or system_words[si].is_multiword.
+#         # Find the start of the multiword span (gs, ss), so the multiword span
+#         # is minimal.
+#         # Initialize multiword_span_end characters index.
+#         if gold_words[gi].is_multiword:
+#             multiword_span_end = gold_words[gi].span.end
+#             if not system_words[si].is_multiword and system_words[si].span.start < \
+#                     gold_words[gi].span.start:
+#                 si += 1
+#         else:  # if system_words[si].is_multiword
+#             multiword_span_end = system_words[si].span.end
+#             if not gold_words[gi].is_multiword and gold_words[gi].span.start < \
+#                     system_words[si].span.start:
+#                 gi += 1
+#         gs, ss = gi, si
+#
+#         # Find the end of the multiword span
+#         # (so both gi and si are pointing to the word following the multiword
+#         # span end).
+#         while not beyond_end(gold_words, gi, multiword_span_end) or \
+#                 not beyond_end(system_words, si, multiword_span_end):
+#             gold_start = gold_words[gi].span.start
+#             sys_start = system_words[si].span.start
+#             if gi < len(gold_words) and (si >= len(system_words) or gold_start <= sys_start):
+#                 multiword_span_end = extend_end(gold_words[gi], multiword_span_end)
+#                 gi += 1
+#             else:
+#                 multiword_span_end = extend_end(system_words[si], multiword_span_end)
+#                 si += 1
+#         return gs, ss, gi, si
+#
+#     def compute_lcs(gold_words, system_words, gi, si, gs, ss):
+#         # pylint: disable=too-many-arguments
+#         lcs = [[0] * (si - ss) for _ in range(gi - gs)]
+#         for g in reversed(list(range(gi - gs))):
+#             for s in reversed(list(range(si - ss))):
+#                 if lower(gold_words[gs + g].columns[FORM]) == lower(
+#                         system_words[ss + s].columns[FORM]):
+#                     lcs[g][s] = 1 + (lcs[g + 1][s + 1] if
+#                                      g + 1 < gi - gs and s + 1 < si - ss
+#                                      else 0)
+#                 lcs[g][s] = max(lcs[g][s],
+#                                 lcs[g + 1][s] if g + 1 < gi - gs else 0)
+#                 lcs[g][s] = max(lcs[g][s],
+#                                 lcs[g][s + 1] if s + 1 < si - ss else 0)
+#         return lcs
+#
+#     def align_words(gold_words, system_words):
+#         alignment = Alignment(gold_words, system_words)
+#
+#         gi, si = 0, 0
+#         while gi < len(gold_words) and si < len(system_words):
+#             if gold_words[gi].is_multiword or system_words[si].is_multiword:
+#                 # A: Multi-word tokens => align via LCS within the whole
+#                 # "multiword span".
+#                 gs, ss, gi, si = find_multiword_span(gold_words, system_words,
+#                                                      gi, si)
+#
+#                 if si > ss and gi > gs:
+#                     lcs = compute_lcs(gold_words, system_words, gi, si, gs, ss)
+#
+#                     # Store aligned words
+#                     s, g = 0, 0
+#                     while g < gi - gs and s < si - ss:
+#                         if lower(gold_words[gs + g].columns[FORM]) == lower(
+#                                 system_words[ss + s].columns[FORM]):
+#                             alignment.append_aligned_words(gold_words[gs + g],
+#                                                            system_words[
+#                                                                ss + s])
+#                             g += 1
+#                             s += 1
+#                         elif lcs[g][s] == (
+#                                 lcs[g + 1][s] if g + 1 < gi - gs else 0):
+#                             g += 1
+#                         else:
+#                             s += 1
+#             else:
+#                 # B: No multi-word token => align according to spans.
+#                 if (gold_words[gi].span.start, gold_words[gi].span.end) == (
+#                         system_words[si].span.start,
+#                         system_words[si].span.end):
+#                     alignment.append_aligned_words(gold_words[gi],
+#                                                    system_words[si])
+#                     gi += 1
+#                     si += 1
+#                 elif gold_words[gi].span.start <= system_words[si].span.start:
+#                     gi += 1
+#                 else:
+#                     si += 1
+#
+#         alignment.fill_parents()
+#
+#         return alignment
+#
+#     # Check that underlying character sequences do match
+#     if gold_ud.characters != system_ud.characters:
+#         index = 0
+#         while gold_ud.characters[index] == system_ud.characters[index]:
+#             index += 1
+#
+#         raise UDError(
+#             "The concatenation of tokens in gold file and in system file "
+#             "differ!\n"
+#             + "First 20 differing characters in gold file: '{}' and system file:"
+#             " '{}'".format(
+#                 "".join(gold_ud.characters[index:index + 20]),
+#                 "".join(system_ud.characters[index:index + 20])
+#             )
+#         )
+#
+#     # Align words
+#     alignment = align_words(gold_ud.words, system_ud.words)
+#
+#     # Compute the F1-scores
+#     result = {
+#         "Tokens": spans_score(gold_ud.tokens, system_ud.tokens),
+#         "Sentences": spans_score(gold_ud.sentences, system_ud.sentences),
+#         "Words": alignment_score(alignment, None),
+#         "UPOS": alignment_score(alignment, lambda w, parent: w.columns[UPOS]),
+#         "XPOS": alignment_score(alignment, lambda w, parent: w.columns[XPOS]),
+#         "Feats": alignment_score(alignment,
+#                                  lambda w, parent: w.columns[FEATS]),
+#         "AllTags": alignment_score(alignment, lambda w, parent: (
+#             w.columns[UPOS], w.columns[XPOS], w.columns[FEATS])),
+#         "Lemmas": alignment_score(alignment,
+#                                   lambda w, parent: w.columns[LEMMA]),
+#         "UAS": alignment_score(alignment, lambda w, parent: parent),
+#         "LAS": alignment_score(alignment,
+#                                lambda w, parent: (parent, w.columns[DEPREL])),
+#     }
+#
+#     # Add WeightedLAS if weights are given
+#     if deprel_weights is not None:
+#         def weighted_las(word):
+#             return deprel_weights.get(word.columns[DEPREL], 1.0)
+#
+#         result["WeightedLAS"] = alignment_score(alignment, lambda w, parent: (
+#             parent, w.columns[DEPREL]), weighted_las)
+#
+#     return result
+
+
+# def load_deprel_weights(weights_file):
+#     if weights_file is None:
+#         return None
+#
+#     deprel_weights = {}
+#     with open(weights_file) as f:
+#         for line in f:
+#             # Ignore comments and empty lines
+#             if line.startswith("#") or not line.strip():
+#                 continue
+#
+#             columns = line.rstrip("\r\n").split()
+#             if len(columns) != 2:
+#                 raise ValueError(
+#                     "Expected two columns in the UD Relations weights file on line"
+#                     " '{}'".format(
+#                         line))
+#
+#             deprel_weights[columns[0]] = float(columns[1])
+#
+#     return deprel_weights
+
+
+# def load_conllu_file(path):
+#     with open(path, mode="r", **({"encoding": "utf-8"} if sys.version_info >= (3, 0) else {})) \
+#             as _file:
+#         return load_conllu(_file)
+
+
+# def evaluate_wrapper(gold_file: str, system_file: str, weights_file: str):
+#     # Load CoNLL-U files
+#     gold_ud = load_conllu_file(gold_file)
+#     system_ud = load_conllu_file(system_file)
+#
+#     # Load weights if requested
+#     deprel_weights = load_deprel_weights(weights_file)
+#
+#     return evaluate(gold_ud, system_ud, deprel_weights)
+
+
+# def run_conllu_eval(gold_file, test_file, weights_file=WEIGHTS, verbose=True):
+#     # Use verbose if weights are supplied
+#     if weights_file is not None and not verbose:
+#         verbose = True
+#
+#     # Evaluate
+#     evaluation = evaluate_wrapper(gold_file, test_file, weights_file)
+#
+#     # Write the evaluation to file
+#     with open(test_file[:test_file.rindex('.')] + '_eval.txt', 'w') as out_file:
+#         if not verbose:
+#             out_file.write("LAS F1 Score: {:.2f}".format(100 * evaluation["LAS"].f1) + '\n')
+#         else:
+#             metrics = ["Tokens", "Sentences", "Words", "UPOS", "XPOS", "Feats",
+#                        "AllTags", "Lemmas", "UAS", "LAS"]
+#             if weights_file is not None:
+#                 metrics.append("WeightedLAS")
+#
+#             out_file.write("Metrics    | Precision |    Recall |  F1 Score | AligndAcc" + '\n')
+#             out_file.write("-----------+-----------+-----------+-----------+-----------" + '\n')
+#             for metric in metrics:
+#                 out_file.write("{:11}|{:10.2f} |{:10.2f} |{:10.2f} |{}".format(
+#                     metric,
+#                     100 * evaluation[metric].precision,
+#                     100 * evaluation[metric].recall,
+#                     100 * evaluation[metric].f1,
+#                     "{:10.2f}".format(100 * evaluation[metric].aligned_accuracy)
+#                     if evaluation[metric].aligned_accuracy is not None else ""
+#                 ) + '\n')
+
+
+# def download_unlicensed_file(url, sourcefile, destfile, totalsz=None):
+#     """
+#     Download the file specified by the given URL.
+#     Args:
+#         url (str): url to download from
+#         sourcefile (str): file to download from url
+#         destfile (str): save path
+#         totalsz (:obj:`int`, optional): total size of file
+#     """
+#     req = requests.get(posixpath.join(url, sourcefile),
+#                        stream=True)
+#
+#     chunksz = 1024 ** 2
+#     if totalsz is None:
+#         if "Content-length" in req.headers:
+#             totalsz = int(req.headers["Content-length"])
+#             nchunks = totalsz // chunksz
+#         else:
+#             print("Unable to determine total file size.")
+#             nchunks = None
+#     else:
+#         nchunks = totalsz // chunksz
+#
+#     print("Downloading file to: {}".format(destfile))
+#     with open(destfile, 'wb') as f:
+#         for data in tqdm(req.iter_content(chunksz), total=nchunks, unit="MB"):
+#             f.write(data)
+#     print("Download Complete")
+
+
+# def uncompress_file(filepath, outpath='.'):
+#     """
+#     Unzip a file to the same location of filepath
+#     uses decompressing algorithm by file extension
+#     Args:
+#         filepath (str): path to file
+#         outpath (str): path to extract to
+#     """
+#     if filepath.endswith('.zip'):
+#         z = zipfile.ZipFile(filepath, 'r')
+#         z.extractall(outpath)
+#         z.close()
+#     elif filepath.endswith('.gz'):
+#         if os.path.isdir(outpath):
+#             raise ValueError('output path for gzip must be a file')
+#         with gzip.open(filepath, 'rb') as fp:
+#             file_content = fp.read()
+#         with open(outpath, 'wb') as fp:
+#             fp.write(file_content)
+#     else:
+#         raise ValueError('Unsupported archive provided. Method supports only .zip/.gz files.')
+
+
 ################################## Data Types ##################################
 
 class LexiconElement(object):
@@ -249,393 +1165,14 @@ class SentimentSentence(object):
 
 ################################## BISTParser ##################################
 
-# DONE # from nlp_architect.common.core_nlp_doc import CoreNLPDoc
-# DONE # from nlp_architect.data.conll import ConllEntry
-# DONE # from nlp_architect.models.bist_parser import BISTModel
-# DONE # from nlp_architect.models.bist import utils (.vocab .write_conll .run_eval)
-# DONE # from nlp_architect.models.bist.utils import get_options_dict
-# DONE # from nlp_architect.models.bist.eval.conllu.conll17_ud_eval import run_conllu_eval
-# DONE # from nlp_architect.utils.io import validate, validate_existing_filepath
-# DONE # from nlp_architect import LIBRARY_OUT
-# DONE # from nlp_architect.utils.io import download_unlicensed_file, uncompress_file
-# DONE # from nlp_architect.utils.io import validate
-# from nlp_architect.utils.text import SpacyInstance
+
+################################## Inference  ##################################
 
 
-class Vocabulary:
-    """
-    A vocabulary that maps words to ints (storing a vocabulary)
-    """
-
-    def __init__(self, start=0):
-
-        self._vocab = {}
-        self._rev_vocab = {}
-        self.next = start
-
-    def add(self, word):
-        """
-        Add word to vocabulary
-        Args:
-            word (str): word to add
-        Returns:
-            int: id of added word
-        """
-        if word not in self._vocab.keys():
-            self._vocab[word] = self.next
-            self._rev_vocab[self.next] = word
-            self.next += 1
-        return self._vocab.get(word)
-
-    def word_id(self, word):
-        """
-        Get the word_id of given word
-        Args:
-            word (str): word from vocabulary
-        Returns:
-            int: int id of word
-        """
-        return self._vocab.get(word, None)
-
-    def __getitem__(self, item):
-        """
-        Get the word_id of given word (same as `word_id`)
-        """
-        return self.word_id(item)
-
-    def __len__(self):
-        return len(self._vocab)
-
-    def __iter__(self):
-        for word in self.vocab.keys():
-            yield word
-
-    @property
-    def max(self):
-        return self.next
-
-    def id_to_word(self, wid):
-        """
-        Word-id to word (string)
-        Args:
-            wid (int): word id
-        Returns:
-            str: string of given word id
-        """
-        return self._rev_vocab.get(wid)
-
-    @property
-    def vocab(self):
-        """
-        dict: get the dict object of the vocabulary
-        """
-        return self._vocab
-
-    def add_vocab_offset(self, offset):
-        """
-        Adds an offset to the ints of the vocabulary
-        Args:
-            offset (int): an int offset
-        """
-        new_vocab = {}
-        for k, v in self.vocab.items():
-            new_vocab[k] = v + offset
-        self.next += offset
-        self._vocab = new_vocab
-        self._rev_vocab = {v: k for k, v in new_vocab.items()}
-
-    def reverse_vocab(self):
-        """
-        Return the vocabulary as a reversed dict object
-        Returns:
-            dict: reversed vocabulary object
-        """
-        return self._rev_vocab
-
-
-def try_to_load_spacy(model_name):
-    try:
-        spacy.load(model_name)
-        return True
-    except OSError:
-        return False
-
-
-class SpacyInstance:
-    """
-    Spacy pipeline wrapper which prompts user for model download authorization.
-    Args:
-        model (str, optional): spacy model name (default: english small model)
-        disable (list of string, optional): pipeline annotators to disable
-            (default: [])
-        display_prompt (bool, optional): flag to display/skip license prompt
-    """
-
-    def __init__(self, model='en', disable=None, display_prompt=True):
-        if disable is None:
-            disable = []
-        try:
-            self._parser = spacy.load(model, disable=disable)
-        except OSError:
-            url = 'https://spacy.io/models'
-            if display_prompt and license_prompt('Spacy {} model'.format(model), url) is False:
-                sys.exit(0)
-            spacy_download(model)
-            self._parser = spacy.load(model, disable=disable)
-
-    @property
-    def parser(self):
-        """return Spacy's instance parser"""
-        return self._parser
-
-    def tokenize(self, text: str) -> List[str]:
-        """
-        Tokenize a sentence into tokens
-        Args:
-            text (str): text to tokenize
-        Returns:
-            list: a list of str tokens of input
-        """
-        # pylint: disable=not-callable
-
-        return [t.text for t in self.parser(text)]
-
-
-stemmer = EnglishStemmer()
-lemmatizer = WordNetLemmatizer()
-spacy_lemmatizer = Lemmatizer(LEMMA_INDEX, LEMMA_EXC, LEMMA_RULES)
-p = re.compile(r'[ \-,;.@&_]')
-
-
-class Stopwords(object):
-    """
-    Stop words list class.
-    """
-    stop_words = []
-
-    @staticmethod
-    def get_words():
-        if not Stopwords.stop_words:
-            sw_path = path.join(path.dirname(path.realpath(__file__)),
-                                'resources',
-                                'stopwords.txt')
-            with open(sw_path) as fp:
-                stop_words = []
-                for w in fp:
-                    stop_words.append(w.strip().lower())
-            Stopwords.stop_words = stop_words
-        return Stopwords.stop_words
-
-
-def simple_normalizer(text):
-    """
-    Simple text normalizer. Runs each token of a phrase thru wordnet lemmatizer
-    and a stemmer.
-    """
-    if not str(text).isupper() or \
-            not str(text).endswith('S') or \
-            not len(text.split()) == 1:
-        tokens = list(filter(lambda x: len(x) != 0, p.split(text.strip())))
-        text = ' '.join([stemmer.stem(lemmatizer.lemmatize(t))
-                         for t in tokens])
-    return text
-
-
-def spacy_normalizer(text, lemma=None):
-    """
-    Simple text normalizer using spacy lemmatizer. Runs each token of a phrase
-    thru a lemmatizer and a stemmer.
-    Arguments:
-        text(string): the text to normalize.
-        lemma(string): lemma of the given text. in this case only stemmer will
-        run.
-    """
-    if not str(text).isupper() or \
-            not str(text).endswith('S') or \
-            not len(text.split()) == 1:
-        tokens = list(filter(lambda x: len(x) != 0, p.split(text.strip())))
-        if lemma:
-            lemma = lemma.split(' ')
-            text = ' '.join([stemmer.stem(l)
-                             for l in lemma])
-        else:
-            text = ' '.join([stemmer.stem(spacy_lemmatizer(t, u'NOUN')[0])
-                             for t in tokens])
-    return text
-
-
-def read_sequential_tagging_file(file_path, ignore_line_patterns=None):
-    """
-    Read a tab separated sequential tagging file.
-    Returns a list of list of tuple of tags (sentences, words)
-    Args:
-        file_path (str): input file path
-        ignore_line_patterns (list, optional): list of string patterns to ignore
-    Returns:
-        list of list of tuples
-    """
-    if ignore_line_patterns:
-        assert isinstance(ignore_line_patterns, list), 'ignore_line_patterns must be a list'
-
-    def _split_into_sentences(file_lines):
-        sentences = []
-        s = []
-        for line in file_lines:
-            if len(line) == 0:
-                sentences.append(s)
-                s = []
-                continue
-            s.append(line)
-        if len(s) > 0:
-            sentences.append(s)
-        return sentences
-
-    with open(file_path, encoding='utf-8') as fp:
-        data = fp.readlines()
-        data = [d.strip() for d in data]
-        if ignore_line_patterns:
-            for s in ignore_line_patterns:
-                data = [d for d in data if s not in d]
-        data = [tuple(d.split()) for d in data]
-    return _split_into_sentences(data)
-
-
-def word_vector_generator(data, lower=False, start=0):
-    """
-    Word vector generator util.
-    Transforms a list of sentences into numpy int vectors and returns the
-    constructed vocabulary
-    Arguments:
-        data (list): list of list of strings
-        lower (bool, optional): transform strings into lower case
-        start (int, optional): vocabulary index start integer
-    Returns:
-        2D numpy array and Vocabulary of the detected words
-    """
-    vocab = Vocabulary(start)
-    data_vec = []
-    for sentence in data:
-        sentence_vec = []
-        for w in sentence:
-            word = w
-            if lower:
-                word = word.lower()
-            wid = vocab[word]
-            if wid is None:
-                wid = vocab.add(word)
-            sentence_vec.append(wid)
-        data_vec.append(sentence_vec)
-    return data_vec, vocab
-
-
-def character_vector_generator(data, start=0):
-    """
-    Character word vector generator util.
-    Transforms a list of sentences into numpy int vectors of the characters
-    of the words of the sentence, and returns the constructed vocabulary
-    Arguments:
-        data (list): list of list of strings
-        start (int, optional): vocabulary index start integer
-    Returns:
-        np.array: a 2D numpy array
-        Vocabulary: constructed vocabulary
-    """
-    vocab = Vocabulary(start)
-    data_vec = []
-    for sentence in data:
-        sentence_vec = []
-        for w in sentence:
-            word_vec = []
-            for char in w:
-                cid = vocab[char]
-                if cid is None:
-                    cid = vocab.add(char)
-                word_vec.append(cid)
-            sentence_vec.append(word_vec)
-        data_vec.append(sentence_vec)
-    return data_vec, vocab
-
-
-def extract_nps(annotation_list, text=None):
-    """
-    Extract Noun Phrases from given text tokens and phrase annotations.
-    Returns a list of tuples with start/end indexes.
-    Args:
-        annotation_list (list): a list of annotation tags in str
-        text (list, optional): a list of token texts in str
-    Returns:
-        list of start/end markers of noun phrases, if text is provided a list of noun phrase texts
-    """
-    np_starts = [i for i in range(len(annotation_list)) if annotation_list[i] == 'B-NP']
-    np_markers = []
-    for s in np_starts:
-        i = 1
-        while s + i < len(annotation_list) and annotation_list[s + i] == 'I-NP':
-            i += 1
-        np_markers.append((s, s + i))
-    return_markers = np_markers
-    if text:
-        assert len(text) == len(annotation_list), 'annotations/text length mismatch'
-        return_markers = [' '.join(text[s:e]) for s, e in np_markers]
-    return return_markers
-
-
-def bio_to_spans(text: List[str], tags: List[str]) -> List[Tuple[int, int, str]]:
-    """
-    Convert BIO tagged list of strings into span starts and ends
-    Args:
-        text: list of words
-        tags: list of tags
-    Returns:
-        tuple: list of start, end and tag of detected spans
-    """
-    pointer = 0
-    starts = []
-    for i, t, in enumerate(tags):
-        if t.startswith('B-'):
-            starts.append((i, pointer))
-        pointer += len(text[i]) + 1
-
-    spans = []
-    for s_i, s_char in starts:
-        label_str = tags[s_i][2:]
-        e = 0
-        e_char = len(text[s_i + e])
-        while len(tags) > s_i + e + 1 and tags[s_i + e + 1].startswith('I-'):
-            e += 1
-            e_char += 1 + len(text[s_i + e])
-        spans.append((s_char, s_char + e_char, label_str))
-    return spans
-
-
-def _download_pretrained_model():
-    """Downloads the pre-trained BIST model if non-existent."""
-    if not path.isfile(SpacyBISTParser.dir / 'bist.model'):
-        print('Downloading pre-trained BIST model...')
-        zip_path = SpacyBISTParser.dir / 'bist-pretrained.zip'
-        makedirs(SpacyBISTParser.dir, exist_ok=True)
-        download_unlicensed_file(
-            'https://s3-us-west-2.amazonaws.com/nlp-architect-data/models/dep_parse/',
-            'bist-pretrained.zip', zip_path)
-        print('Unzipping...')
-        uncompress_file(zip_path, outpath=str(SpacyBISTParser.dir))
-        remove(zip_path)
-        print('Done.')
-
-
-def vocab(conll_path):
-    # pylint: disable=missing-docstring
-    words_count = Counter()
-    pos_count = Counter()
-    rel_count = Counter()
-
-    for sentence in read_conll(conll_path):
-        words_count.update([node.norm for node in sentence if isinstance(node, ConllEntry)])
-        pos_count.update([node.pos for node in sentence if isinstance(node, ConllEntry)])
-        rel_count.update([node.relation for node in sentence if isinstance(node, ConllEntry)])
-
-    return words_count, {w: i for i, w in enumerate(words_count.keys())}, list(
-        pos_count.keys()), list(rel_count.keys())
+INTENSIFIER_FACTOR = 0.3
+VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
+NUMBER_REGEX = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
+# + data type classes
 
 
 def read_conll(path):
@@ -663,577 +1200,6 @@ def read_conll(path):
                                    tok[7], tok[8], tok[9]))
         if len(tokens) > 1:
             yield tokens
-
-
-def run_eval(gold, test):
-    """Evaluates a set of predictions using the appropriate script."""
-    if is_conllu(gold):
-        run_conllu_eval(gold_file=gold, test_file=test)
-    else:
-        eval_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'eval', 'eval.pl')
-        with open(test[:test.rindex('.')] + '_eval.txt', 'w') as out_file:
-            subprocess.run(['perl', eval_script, '-g', gold, '-s', test], stdout=out_file)
-
-
-def is_conllu(path):
-    """Determines if the file is in CoNLL-U format."""
-    return os.path.splitext(path.lower())[1] == '.conllu'
-
-
-def get_options_dict(activation, lstm_dims, lstm_layers, pos_dims):
-    """Generates dictionary with all parser options."""
-    return {'activation': activation, 'lstm_dims': lstm_dims, 'lstm_layers': lstm_layers,
-            'pembedding_dims': pos_dims, 'wembedding_dims': 100, 'rembedding_dims': 25,
-            'hidden_units': 100, 'hidden2_units': 0, 'learning_rate': 0.1, 'blstmFlag': True,
-            'labelsFlag': True, 'bibiFlag': True, 'costaugFlag': True, 'seed': 0, 'mem': 0}
-
-
-# CoNLL-U column names
-ID, FORM, LEMMA, UPOS, XPOS, FEATS, HEAD, DEPREL, DEPS, MISC = list(range(10))
-
-WEIGHTS = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'weights.clas')
-
-# UD Error is used when raising exceptions in this module
-class UDError(Exception):
-    pass
-
-
-# Load given CoNLL-U file into internal representation
-def load_conllu(file):
-    # pylint: disable=too-many-locals
-    # pylint: disable=too-many-branches
-    # pylint: disable=too-many-statements
-
-    # Internal representation classes
-    class UDRepresentation:
-        # pylint: disable=too-few-public-methods
-        def __init__(self):
-            # Characters of all the tokens in the whole file.
-            # Whitespace between tokens is not included.
-            self.characters = []
-            # List of UDSpan instances with start&end indices into `characters`
-            self.tokens = []
-            # List of UDWord instances.
-            self.words = []
-            # List of UDSpan instances with start&end indices into `characters`
-            self.sentences = []
-
-    class UDSpan:
-        # pylint: disable=too-few-public-methods
-        def __init__(self, start, end):
-            self.start = start
-            # Note that self.end marks the first position **after the end** of
-            # span, so we can use characters[start:end] or range(start, end).
-            self.end = end
-
-    class UDWord:
-        # pylint: disable=too-few-public-methods
-        def __init__(self, span, columns, is_multiword):
-            # Span of this word (or MWT, see below) within
-            # ud_representation.characters.
-            self.span = span
-            # 10 columns of the CoNLL-U file: ID, FORM, LEMMA,...
-            self.columns = columns
-            # is_multiword==True means that this word is part of a multi-word
-            # token.
-            # In that case, self.span marks the span of the whole multi-word
-            # token.
-            self.is_multiword = is_multiword
-            # Reference to the UDWord instance representing the HEAD (or None
-            # if root).
-            self.parent = None
-            # Let's ignore language-specific deprel subtypes.
-            self.columns[DEPREL] = columns[DEPREL].split(':')[0]
-
-    ud = UDRepresentation()
-
-    # Load the CoNLL-U file
-    index, sentence_start = 0, None
-    while True:
-        line = file.readline()
-        if not line:
-            break
-        line = line.rstrip("\r\n")
-
-        # Handle sentence start boundaries
-        if sentence_start is None:
-            # Skip comments
-            if line.startswith("#"):
-                continue
-            # Start a new sentence
-            ud.sentences.append(UDSpan(index, 0))
-            sentence_start = len(ud.words)
-        if not line:
-            # Add parent UDWord links and check there are no cycles
-            def process_word(word):
-                if word.parent == "remapping":
-                    raise UDError("There is a cycle in a sentence")
-                if word.parent is None:
-                    head = int(word.columns[HEAD])
-                    if head > len(ud.words) - sentence_start:
-                        raise UDError(
-                            "HEAD '{}' points outside of the sentence".format(
-                                word.columns[HEAD]))
-                    if head:
-                        parent = ud.words[sentence_start + head - 1]
-                        word.parent = "remapping"
-                        process_word(parent)
-                        word.parent = parent
-
-            for word in ud.words[sentence_start:]:
-                process_word(word)
-
-            # Check there is a single root node
-            if len([word for word in ud.words[sentence_start:] if
-                    word.parent is None]) != 1:
-                raise UDError("There are multiple roots in a sentence")
-
-            # End the sentence
-            ud.sentences[-1].end = index
-            sentence_start = None
-            continue
-
-        # Read next token/word
-        columns = line.split("\t")
-        if len(columns) != 10:
-            raise UDError(
-                "The CoNLL-U line does not contain 10 tab-separated columns: "
-                "'{}'".format(line))
-
-        # Skip empty nodes
-        if "." in columns[ID]:
-            continue
-
-        # Delete spaces from FORM  so gold.characters == system.characters
-        # even if one of them tokenizes the space.
-        columns[FORM] = columns[FORM].replace(" ", "")
-        if not columns[FORM]:
-            raise UDError("There is an empty FORM in the CoNLL-U file")
-
-        # Save token
-        ud.characters.extend(columns[FORM])
-        ud.tokens.append(UDSpan(index, index + len(columns[FORM])))
-        index += len(columns[FORM])
-
-        # Handle multi-word tokens to save word(s)
-        if "-" in columns[ID]:
-            try:
-                start, end = list(map(int, columns[ID].split("-")))
-            except Exception:
-                raise UDError("Cannot parse multi-word token ID '{}'".format(
-                    columns[ID]))
-
-            for _ in range(start, end + 1):
-                word_line = file.readline().rstrip("\r\n")
-                word_columns = word_line.split("\t")
-                if len(word_columns) != 10:
-                    raise UDError(
-                        "The CoNLL-U line does not contain 10 tab-separated "
-                        "columns: '{}'".format(word_line))
-                ud.words.append(
-                    UDWord(ud.tokens[-1], word_columns, is_multiword=True))
-        # Basic tokens/words
-        else:
-            try:
-                word_id = int(columns[ID])
-            except Exception:
-                raise UDError("Cannot parse word ID '{}'".format(columns[ID]))
-            if word_id != len(ud.words) - sentence_start + 1:
-                raise UDError("Incorrect word ID '{}' for word '{}', expected"
-                              " '{}'".format(columns[ID], columns[FORM],
-                                             len(ud.words)
-                                             - sentence_start + 1))
-
-            try:
-                head_id = int(columns[HEAD])
-            except Exception:
-                raise UDError("Cannot parse HEAD '{}'".format(columns[HEAD]))
-            if head_id < 0:
-                raise UDError("HEAD cannot be negative")
-
-            ud.words.append(UDWord(ud.tokens[-1], columns, is_multiword=False))
-
-    if sentence_start is not None:
-        raise UDError("The CoNLL-U file does not end with empty line")
-
-    return ud
-
-
-# Evaluate the gold and system treebanks (loaded using load_conllu).
-def evaluate(gold_ud, system_ud, deprel_weights=None):
-    # pylint: disable=too-many-locals
-    class Score:
-        # pylint: disable=too-few-public-methods
-        def __init__(self, gold_total, system_total, correct,
-                     aligned_total=None):
-            self.precision = correct / system_total if system_total else 0.0
-            self.recall = correct / gold_total if gold_total else 0.0
-            self.f1 = 2 * correct / (system_total + gold_total) \
-                if system_total + gold_total else 0.0
-            self.aligned_accuracy = \
-                correct / aligned_total if aligned_total else aligned_total
-
-    class AlignmentWord:
-        # pylint: disable=too-few-public-methods
-        def __init__(self, gold_word, system_word):
-            self.gold_word = gold_word
-            self.system_word = system_word
-            self.gold_parent = None
-            self.system_parent_gold_aligned = None
-
-    class Alignment:
-        def __init__(self, gold_words, system_words):
-            self.gold_words = gold_words
-            self.system_words = system_words
-            self.matched_words = []
-            self.matched_words_map = {}
-
-        def append_aligned_words(self, gold_word, system_word):
-            self.matched_words.append(AlignmentWord(gold_word, system_word))
-            self.matched_words_map[system_word] = gold_word
-
-        def fill_parents(self):
-            # We represent root parents in both gold and system data by '0'.
-            # For gold data, we represent non-root parent by corresponding gold
-            # word.
-            # For system data, we represent non-root parent by either gold word
-            # aligned
-            # to parent system nodes, or by None if no gold words is aligned to
-            # the parent.
-            for words in self.matched_words:
-                words.gold_parent = words.gold_word.parent if \
-                    words.gold_word.parent is not None else 0
-                words.system_parent_gold_aligned = self.matched_words_map.get(
-                    words.system_word.parent, None) \
-                    if words.system_word.parent is not None else 0
-
-    def lower(text):
-        if sys.version_info < (3, 0) and isinstance(text, str):
-            return text.decode("utf-8").lower()
-        return text.lower()
-
-    def spans_score(gold_spans, system_spans):
-        correct, gi, si = 0, 0, 0
-        while gi < len(gold_spans) and si < len(system_spans):
-            if system_spans[si].start < gold_spans[gi].start:
-                si += 1
-            elif gold_spans[gi].start < system_spans[si].start:
-                gi += 1
-            else:
-                correct += gold_spans[gi].end == system_spans[si].end
-                si += 1
-                gi += 1
-
-        return Score(len(gold_spans), len(system_spans), correct)
-
-    def alignment_score(alignment, key_fn, weight_fn=lambda w: 1):
-        gold, system, aligned, correct = 0, 0, 0, 0
-
-        for word in alignment.gold_words:
-            gold += weight_fn(word)
-
-        for word in alignment.system_words:
-            system += weight_fn(word)
-
-        for words in alignment.matched_words:
-            aligned += weight_fn(words.gold_word)
-
-        if key_fn is None:
-            # Return score for whole aligned words
-            return Score(gold, system, aligned)
-
-        for words in alignment.matched_words:
-            if key_fn(words.gold_word, words.gold_parent) == key_fn(
-                    words.system_word,
-                    words.system_parent_gold_aligned):
-                correct += weight_fn(words.gold_word)
-
-        return Score(gold, system, correct, aligned)
-
-    def beyond_end(words, i, multiword_span_end):
-        if i >= len(words):
-            return True
-        if words[i].is_multiword:
-            return words[i].span.start >= multiword_span_end
-        return words[i].span.end > multiword_span_end
-
-    def extend_end(word, multiword_span_end):
-        if word.is_multiword and word.span.end > multiword_span_end:
-            return word.span.end
-        return multiword_span_end
-
-    def find_multiword_span(gold_words, system_words, gi, si):
-        # We know gold_words[gi].is_multiword or system_words[si].is_multiword.
-        # Find the start of the multiword span (gs, ss), so the multiword span
-        # is minimal.
-        # Initialize multiword_span_end characters index.
-        if gold_words[gi].is_multiword:
-            multiword_span_end = gold_words[gi].span.end
-            if not system_words[si].is_multiword and system_words[si].span.start < \
-                    gold_words[gi].span.start:
-                si += 1
-        else:  # if system_words[si].is_multiword
-            multiword_span_end = system_words[si].span.end
-            if not gold_words[gi].is_multiword and gold_words[gi].span.start < \
-                    system_words[si].span.start:
-                gi += 1
-        gs, ss = gi, si
-
-        # Find the end of the multiword span
-        # (so both gi and si are pointing to the word following the multiword
-        # span end).
-        while not beyond_end(gold_words, gi, multiword_span_end) or \
-                not beyond_end(system_words, si, multiword_span_end):
-            gold_start = gold_words[gi].span.start
-            sys_start = system_words[si].span.start
-            if gi < len(gold_words) and (si >= len(system_words) or gold_start <= sys_start):
-                multiword_span_end = extend_end(gold_words[gi], multiword_span_end)
-                gi += 1
-            else:
-                multiword_span_end = extend_end(system_words[si], multiword_span_end)
-                si += 1
-        return gs, ss, gi, si
-
-    def compute_lcs(gold_words, system_words, gi, si, gs, ss):
-        # pylint: disable=too-many-arguments
-        lcs = [[0] * (si - ss) for _ in range(gi - gs)]
-        for g in reversed(list(range(gi - gs))):
-            for s in reversed(list(range(si - ss))):
-                if lower(gold_words[gs + g].columns[FORM]) == lower(
-                        system_words[ss + s].columns[FORM]):
-                    lcs[g][s] = 1 + (lcs[g + 1][s + 1] if
-                                     g + 1 < gi - gs and s + 1 < si - ss
-                                     else 0)
-                lcs[g][s] = max(lcs[g][s],
-                                lcs[g + 1][s] if g + 1 < gi - gs else 0)
-                lcs[g][s] = max(lcs[g][s],
-                                lcs[g][s + 1] if s + 1 < si - ss else 0)
-        return lcs
-
-    def align_words(gold_words, system_words):
-        alignment = Alignment(gold_words, system_words)
-
-        gi, si = 0, 0
-        while gi < len(gold_words) and si < len(system_words):
-            if gold_words[gi].is_multiword or system_words[si].is_multiword:
-                # A: Multi-word tokens => align via LCS within the whole
-                # "multiword span".
-                gs, ss, gi, si = find_multiword_span(gold_words, system_words,
-                                                     gi, si)
-
-                if si > ss and gi > gs:
-                    lcs = compute_lcs(gold_words, system_words, gi, si, gs, ss)
-
-                    # Store aligned words
-                    s, g = 0, 0
-                    while g < gi - gs and s < si - ss:
-                        if lower(gold_words[gs + g].columns[FORM]) == lower(
-                                system_words[ss + s].columns[FORM]):
-                            alignment.append_aligned_words(gold_words[gs + g],
-                                                           system_words[
-                                                               ss + s])
-                            g += 1
-                            s += 1
-                        elif lcs[g][s] == (
-                                lcs[g + 1][s] if g + 1 < gi - gs else 0):
-                            g += 1
-                        else:
-                            s += 1
-            else:
-                # B: No multi-word token => align according to spans.
-                if (gold_words[gi].span.start, gold_words[gi].span.end) == (
-                        system_words[si].span.start,
-                        system_words[si].span.end):
-                    alignment.append_aligned_words(gold_words[gi],
-                                                   system_words[si])
-                    gi += 1
-                    si += 1
-                elif gold_words[gi].span.start <= system_words[si].span.start:
-                    gi += 1
-                else:
-                    si += 1
-
-        alignment.fill_parents()
-
-        return alignment
-
-    # Check that underlying character sequences do match
-    if gold_ud.characters != system_ud.characters:
-        index = 0
-        while gold_ud.characters[index] == system_ud.characters[index]:
-            index += 1
-
-        raise UDError(
-            "The concatenation of tokens in gold file and in system file "
-            "differ!\n"
-            + "First 20 differing characters in gold file: '{}' and system file:"
-            " '{}'".format(
-                "".join(gold_ud.characters[index:index + 20]),
-                "".join(system_ud.characters[index:index + 20])
-            )
-        )
-
-    # Align words
-    alignment = align_words(gold_ud.words, system_ud.words)
-
-    # Compute the F1-scores
-    result = {
-        "Tokens": spans_score(gold_ud.tokens, system_ud.tokens),
-        "Sentences": spans_score(gold_ud.sentences, system_ud.sentences),
-        "Words": alignment_score(alignment, None),
-        "UPOS": alignment_score(alignment, lambda w, parent: w.columns[UPOS]),
-        "XPOS": alignment_score(alignment, lambda w, parent: w.columns[XPOS]),
-        "Feats": alignment_score(alignment,
-                                 lambda w, parent: w.columns[FEATS]),
-        "AllTags": alignment_score(alignment, lambda w, parent: (
-            w.columns[UPOS], w.columns[XPOS], w.columns[FEATS])),
-        "Lemmas": alignment_score(alignment,
-                                  lambda w, parent: w.columns[LEMMA]),
-        "UAS": alignment_score(alignment, lambda w, parent: parent),
-        "LAS": alignment_score(alignment,
-                               lambda w, parent: (parent, w.columns[DEPREL])),
-    }
-
-    # Add WeightedLAS if weights are given
-    if deprel_weights is not None:
-        def weighted_las(word):
-            return deprel_weights.get(word.columns[DEPREL], 1.0)
-
-        result["WeightedLAS"] = alignment_score(alignment, lambda w, parent: (
-            parent, w.columns[DEPREL]), weighted_las)
-
-    return result
-
-
-def load_deprel_weights(weights_file):
-    if weights_file is None:
-        return None
-
-    deprel_weights = {}
-    with open(weights_file) as f:
-        for line in f:
-            # Ignore comments and empty lines
-            if line.startswith("#") or not line.strip():
-                continue
-
-            columns = line.rstrip("\r\n").split()
-            if len(columns) != 2:
-                raise ValueError(
-                    "Expected two columns in the UD Relations weights file on line"
-                    " '{}'".format(
-                        line))
-
-            deprel_weights[columns[0]] = float(columns[1])
-
-    return deprel_weights
-
-
-def load_conllu_file(path):
-    with open(path, mode="r", **({"encoding": "utf-8"} if sys.version_info >= (3, 0) else {})) \
-            as _file:
-        return load_conllu(_file)
-
-
-def evaluate_wrapper(gold_file: str, system_file: str, weights_file: str):
-    # Load CoNLL-U files
-    gold_ud = load_conllu_file(gold_file)
-    system_ud = load_conllu_file(system_file)
-
-    # Load weights if requested
-    deprel_weights = load_deprel_weights(weights_file)
-
-    return evaluate(gold_ud, system_ud, deprel_weights)
-
-
-def run_conllu_eval(gold_file, test_file, weights_file=WEIGHTS, verbose=True):
-    # Use verbose if weights are supplied
-    if weights_file is not None and not verbose:
-        verbose = True
-
-    # Evaluate
-    evaluation = evaluate_wrapper(gold_file, test_file, weights_file)
-
-    # Write the evaluation to file
-    with open(test_file[:test_file.rindex('.')] + '_eval.txt', 'w') as out_file:
-        if not verbose:
-            out_file.write("LAS F1 Score: {:.2f}".format(100 * evaluation["LAS"].f1) + '\n')
-        else:
-            metrics = ["Tokens", "Sentences", "Words", "UPOS", "XPOS", "Feats",
-                       "AllTags", "Lemmas", "UAS", "LAS"]
-            if weights_file is not None:
-                metrics.append("WeightedLAS")
-
-            out_file.write("Metrics    | Precision |    Recall |  F1 Score | AligndAcc" + '\n')
-            out_file.write("-----------+-----------+-----------+-----------+-----------" + '\n')
-            for metric in metrics:
-                out_file.write("{:11}|{:10.2f} |{:10.2f} |{:10.2f} |{}".format(
-                    metric,
-                    100 * evaluation[metric].precision,
-                    100 * evaluation[metric].recall,
-                    100 * evaluation[metric].f1,
-                    "{:10.2f}".format(100 * evaluation[metric].aligned_accuracy)
-                    if evaluation[metric].aligned_accuracy is not None else ""
-                ) + '\n')
-
-
-def download_unlicensed_file(url, sourcefile, destfile, totalsz=None):
-    """
-    Download the file specified by the given URL.
-    Args:
-        url (str): url to download from
-        sourcefile (str): file to download from url
-        destfile (str): save path
-        totalsz (:obj:`int`, optional): total size of file
-    """
-    req = requests.get(posixpath.join(url, sourcefile),
-                       stream=True)
-
-    chunksz = 1024 ** 2
-    if totalsz is None:
-        if "Content-length" in req.headers:
-            totalsz = int(req.headers["Content-length"])
-            nchunks = totalsz // chunksz
-        else:
-            print("Unable to determine total file size.")
-            nchunks = None
-    else:
-        nchunks = totalsz // chunksz
-
-    print("Downloading file to: {}".format(destfile))
-    with open(destfile, 'wb') as f:
-        for data in tqdm(req.iter_content(chunksz), total=nchunks, unit="MB"):
-            f.write(data)
-    print("Download Complete")
-
-
-def uncompress_file(filepath, outpath='.'):
-    """
-    Unzip a file to the same location of filepath
-    uses decompressing algorithm by file extension
-    Args:
-        filepath (str): path to file
-        outpath (str): path to extract to
-    """
-    if filepath.endswith('.zip'):
-        z = zipfile.ZipFile(filepath, 'r')
-        z.extractall(outpath)
-        z.close()
-    elif filepath.endswith('.gz'):
-        if os.path.isdir(outpath):
-            raise ValueError('output path for gzip must be a file')
-        with gzip.open(filepath, 'rb') as fp:
-            file_content = fp.read()
-        with open(outpath, 'wb') as fp:
-            fp.write(file_content)
-    else:
-        raise ValueError('Unsupported archive provided. Method supports only .zip/.gz files.')
-
-
-################################## Inference  ##################################
-
-INTENSIFIER_FACTOR = 0.3
-VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
-NUMBER_REGEX = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
 
 
 class CoreNLPDoc(object):
@@ -1641,9 +1607,9 @@ class BISTModel(object):
         with open(path.parent / 'params.json') as file:
             self.params = json.load(file)
 
-        from nlp_architect.models.bist.mstlstm import MSTParserLSTM  # TODO
-        self.model = MSTParserLSTM(*self.params)  # TODO
-        self.model.model.populate(str(path))  # TODO
+        from .mstlstm import MSTParserLSTM
+        self.model = MSTParserLSTM(*self.params)  # TODO: add dynet (version==?) as a dependency (pip install)
+        self.model.model.populate(str(path))
 
     def save(self, path):
         """Saves the BIST model to file."""
@@ -1668,7 +1634,7 @@ class SpacyBISTParser(object):
 
         self.verbose = verbose
         self.bist_parser = BISTModel()
-        self.bist_parser.load(bist_model)  # TODO
+        self.bist_parser.load(bist_model)
         self.spacy_parser = SpacyInstance(spacy_model,
                                           disable=['ner', 'vectors', 'textcat']).parser
 
@@ -1809,6 +1775,35 @@ def _load_aspects_from_dict(aspect_lex: dict):
     return lexicon
 
 
+def _sentence_contains_after(sentence, index, phrase):
+    """Returns sentence contains phrase after given index."""
+    for i in range(len(phrase)):
+        if len(sentence) <= index + i or phrase[i].lower() not in \
+                {sentence[index + i][field].lower() for field in ('text', 'lemma')}:
+            return False
+    return True
+
+
+def _consolidate_aspects(aspect_row, sentence):
+    """Returns consolidated indices of aspect terms in sentence.
+
+    Args:
+        aspect_row: List of aspect terms which belong to the same aspect-group.
+    """
+    indices = []
+    aspect_phrases: list = \
+        sorted([phrase.split(' ') for phrase in aspect_row], key=len, reverse=True)
+    appeared = set()
+    for tok_i in range(len(sentence)):
+        for aspect_phrase in aspect_phrases:
+            if _sentence_contains_after(sentence, tok_i, aspect_phrase):
+                span = range(tok_i, tok_i + len(aspect_phrase))
+                if not appeared & set(span):
+                    appeared |= set(span)
+                    indices.append(list(span))
+    return indices
+
+
 class SentimentInference(object):
     """Main class for sentiment inference execution.
     Attributes:
@@ -1897,7 +1892,7 @@ class SentimentInference(object):
         """Extract opinion and aspect terms from sentence."""
         event = []
         sent_aspect_pair = None
-        real_aspect_indices = _consolidate_aspects(aspect_row.term, parsed_sentence)  # TODO
+        real_aspect_indices = _consolidate_aspects(aspect_row.term, parsed_sentence)
         aspect_key = aspect_row.term[0]
         for aspect_index_range in real_aspect_indices:
             for word_index in aspect_index_range:
@@ -2007,8 +2002,8 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     # run inference on the data
     parsed_doc = parse(doc)  # but do this as preprocessing?
 
-    # sentiment_doc = inference.run(parsed_doc=parsed_doc)
-    sentiment_doc = {'aspects': aspect_lex,
-                     'opinions': opinion_lex}
+    sentiment_doc = inference.run(parsed_doc=parsed_doc)
+    # sentiment_doc = {'aspects': aspect_lex,
+    #                  'opinions': opinion_lex}
 
     return sentiment_doc
