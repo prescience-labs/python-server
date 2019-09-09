@@ -30,7 +30,7 @@ def preprocess(input: str) -> list:
     for i, sent in enumerate(sents):
         doc = nlp(sent)
         info = doc2dict(doc)
-        sentences[f'sentence_{i}'] = (s, info)
+        sentences[f'sentence_{i}'] = (sent, info)
 
     return sentences
 

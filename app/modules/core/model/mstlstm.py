@@ -8,7 +8,7 @@ from dynet import ParameterCollection, AdamTrainer, LSTMBuilder, tanh, logistic,
 
 from .architect import ConllEntry
 from .architect import read_conll
-import .decoder
+from .decoder import parse_proj
 
 
 class MSTParserLSTM(object):
@@ -186,7 +186,7 @@ class MSTParserLSTM(object):
                         rentry.lstms[0] = blstm_backward.output()
 
             scores, _ = self._evaluate(conll_sentence)
-            heads = decoder.parse_proj(scores)
+            heads = parse_proj(scores)
 
             for entry, head in zip(conll_sentence, heads):
                 entry.pred_parent_id = head
@@ -274,7 +274,7 @@ class MSTParserLSTM(object):
 
             scores, exprs = self._evaluate(conll_sentence)
             gold = [entry.parent_id for entry in conll_sentence]
-            heads = decoder.parse_proj(scores, gold if self.costaug_flag else None)
+            heads = parse_proj(scores, gold if self.costaug_flag else None)
 
             if self.labels_flag:
                 for modifier, head in enumerate(gold[1:]):

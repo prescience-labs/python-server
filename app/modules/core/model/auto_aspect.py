@@ -40,6 +40,7 @@ def auto_aspect(in_review: str) -> dict:
     # spin up synonyms for each aspect into dict format
     aspect_dict = {}
     for asp in aspects:
+        # wordnet syns, embeddings above sim threshold
         aspect_dict[asp] = [asp, asp.upper(), asp.lower(), asp + 's']
 
     return aspect_dict

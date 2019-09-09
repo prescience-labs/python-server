@@ -22,6 +22,7 @@ import spacy
 
 import requests
 from tqdm import tqdm
+import dynet
 
 
 ################################## Not needed? ##################################
@@ -1116,7 +1117,9 @@ class SentimentDoc(object):
         Returns:
             :obj:`json`: json representations of the object
         """
-        return json.dumps(self, cls=SentimentDocEncoder)
+        # return json.dumps(self, cls=SentimentDocEncoder)
+        jobj = json.dumps(self, cls=SentimentDocEncoder)
+        return json.loads(jobj)
 
     def pretty_json(self):
         """
@@ -1161,6 +1164,27 @@ class SentimentSentence(object):
     @events.setter
     def events(self, val):
         self._events = val
+
+
+class SentimentDocEncoder(JSONEncoder):
+    def default(self, o):  # pylint: disable=E0202
+        try:
+            if isinstance(o, Enum):
+                return getattr(o, '_name_')
+            if hasattr(o, '__dict__'):
+                return vars(o)
+            if hasattr(o, '__slots__'):
+                ret = {slot: getattr(o, slot) for slot in o.__slots__}
+                for cls in type(o).mro():
+                    spr = super(cls, o)
+                    if not hasattr(spr, '__slots__'):
+                        break
+                    for slot in spr.__slots__:
+                        ret[slot] = getattr(o, slot)
+                return ret
+        except Exception as e:
+            print(e)
+        return None
 
 
 ################################## BISTParser ##################################
@@ -1492,8 +1516,9 @@ class SpacyInstance:
         display_prompt (bool, optional): flag to display/skip license prompt
     """
 
-    def __init__(self, model='en', disable=None, display_prompt=True):
-        self._parser = spacy.load(model, disable=disable)
+    def __init__(self, model="en-core-web-sm", disable=None, display_prompt=True):
+        # self._parser = spacy.load(model, disable=disable)
+        self._parser = spacy.load("en_core_web_sm", disable=disable)
 
     @property
     def parser(self):
@@ -1604,11 +1629,12 @@ class BISTModel(object):
 
     def load(self, path):
         """Loads and initializes a BIST model from file."""
-        with open(path.parent / 'params.json') as file:
+        # with open(path.parent / 'params.json') as file:
+        with open('app/modules/core/model/params.json') as file:
             self.params = json.load(file)
 
         from .mstlstm import MSTParserLSTM
-        self.model = MSTParserLSTM(*self.params)  # TODO: add dynet (version==?) as a dependency (pip install)
+        self.model = MSTParserLSTM(*self.params)
         self.model.model.populate(str(path))
 
     def save(self, path):
@@ -1628,13 +1654,13 @@ class SpacyBISTParser(object):
         bist_model (str, optional): Path to a .model file to load. Defaults pre-trained model'.
     """
 
-    def __init__(self, verbose=False, spacy_model='en', bist_model='bist.model'):
+    def __init__(self, verbose=False, spacy_model="en-core-web-sm", bist_model='bist.model'):
         validate((verbose, bool), (spacy_model, str, 0, 1000),
                  (bist_model, (type(None), str), 0, 1000))
 
         self.verbose = verbose
         self.bist_parser = BISTModel()
-        self.bist_parser.load(bist_model)
+        self.bist_parser.load(Path(bist_model))
         self.spacy_parser = SpacyInstance(spacy_model,
                                           disable=['ner', 'vectors', 'textcat']).parser
 
@@ -1847,7 +1873,7 @@ class SentimentInference(object):
                 sentiment_doc.sentences.append(
                     SentimentSentence(sentence[0]['start'],
                                       sentence[-1]['start'] + sentence[-1]['len'] - 1, events))
-        return sentiment_doc
+        return sentiment_doc.json()
 
     def _extract_intensifier_terms(self, toks, sentiment_index, polarity, sentence):
         """Extract intensifier events from sentence."""
@@ -1997,10 +2023,10 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     inference = SentimentInference(aspect_lex, opinion_lex, parse=False)
 
     # source data is raw text, need to parse
-    parse = SpacyBISTParser(bist_model='/Users/Smith-Box/nlp-architect/cache/bist-pretrained/').parse
+    parse = SpacyBISTParser(bist_model='app/modules/core/model/bist.model').parse
 
     # run inference on the data
-    parsed_doc = parse(doc)  # but do this as preprocessing?
+    parsed_doc = parse(data)  # but do this as preprocessing?
 
     sentiment_doc = inference.run(parsed_doc=parsed_doc)
     # sentiment_doc = {'aspects': aspect_lex,

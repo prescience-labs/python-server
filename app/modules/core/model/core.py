@@ -26,7 +26,6 @@ def process_single(input: str):
     result = inference(preprocessed, custom_aspects, opinion_lex)
 
     return result
-    # return custom_aspects
 
 
 def train_model():
