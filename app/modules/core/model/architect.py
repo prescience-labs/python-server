@@ -1107,12 +1107,10 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
 
     # source data is raw text, need to parse
     parse = SpacyBISTParser(bist_model='app/modules/core/model/bist.model').parse
-
-    # run inference on the data
     parsed_doc = parse(data)  # but do this as preprocessing?
 
+    # run inference on the data
     sentiment_doc = inference.run(parsed_doc=parsed_doc)
-    # sentiment_doc = {'aspects': aspect_lex,
-    #                  'opinions': opinion_lex}
+
 
     return sentiment_doc
