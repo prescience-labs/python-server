@@ -143,7 +143,7 @@ class BISTModel(object):
     def load(self, path):
         """Loads and initializes a BIST model from file."""
         # with open(path.parent / 'params.json') as file:
-        with open('app/modules/core/model/params.json') as file:
+        with open('app/modules/core/model/bist/params.json') as file:
             self.params = json.load(file)
 
         from .mstlstm import MSTParserLSTM
