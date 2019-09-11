@@ -1,11 +1,9 @@
-# from .inference import inference
 from .train import train
 from .update import update
 
 from .auto_aspect import auto_aspect
-from .architect import inference
-from .utils import load_opinion
-from .utils import preprocess
+from .inference import inference
+# from .architect import inference
 
 
 def process_single(input: str):
@@ -14,12 +12,10 @@ def process_single(input: str):
     # derive custom aspects programmatically
     custom_aspects = auto_aspect(input)
 
-    # load a pre-trained opinion lexicon
-    # opinion_lex = load_opinion()
+    # get rid of this part?
     opinion_lex = 'opinion_lex.csv'
 
-    # preprocessing
-    # preprocessed = preprocess(input)
+    # preprocessing // and this part
     preprocessed = input
 
     # perform inference with the model

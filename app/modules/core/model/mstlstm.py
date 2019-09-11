@@ -4,10 +4,10 @@ from collections import namedtuple
 from operator import itemgetter
 
 from dynet import ParameterCollection, AdamTrainer, LSTMBuilder, tanh, logistic, rectify, cmult, \
-    SimpleRNNBuilder, concatenate, np, renew_cg, esum  # TODO: add this version of dynet as dependency and BOOM
+    SimpleRNNBuilder, concatenate, np, renew_cg, esum
 
-from .architect import ConllEntry
-from .architect import read_conll
+from .data_types import ConllEntry
+from .utils import read_conll
 from .decoder import parse_proj
 
 

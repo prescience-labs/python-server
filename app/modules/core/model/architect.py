@@ -20,8 +20,6 @@ import zipfile
 from typing import List, Tuple
 import spacy
 
-# import requests
-# from tqdm import tqdm
 import dynet
 
 
@@ -279,7 +277,7 @@ class SentimentDocEncoder(JSONEncoder):
 
 
 INTENSIFIER_FACTOR = 0.3
-VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
+VERB_POS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}  # maybe no
 NUMBER_REGEX = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
 
 def read_conll(path):
@@ -1111,6 +1109,5 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
 
     # run inference on the data
     sentiment_doc = inference.run(parsed_doc=parsed_doc)
-
 
     return sentiment_doc
