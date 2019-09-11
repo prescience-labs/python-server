@@ -7,7 +7,7 @@ TODO:
 import math
 from pathlib import Path
 
-from .parse import SpacyBISTParser
+from .bist.parse import SpacyBISTParser
 from .utils import _load_aspects_from_dict
 from .utils import _load_opinion_lex
 from .utils import _read_lexicon_from_csv

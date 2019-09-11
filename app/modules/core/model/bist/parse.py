@@ -7,12 +7,12 @@ from typing import List
 
 import spacy
 
-from .utils import validate
-from .utils import validate_existing_filepath
-from .utils import _spacy_pos_to_ptb
-from .utils import get_options_dict
-from .utils import ConllEntry
-from .utils import CoreNLPDoc
+from ..utils import validate
+from ..utils import validate_existing_filepath
+from ..utils import _spacy_pos_to_ptb
+from ..utils import get_options_dict
+from ..utils import ConllEntry
+from ..utils import CoreNLPDoc
 from .mstlstm import MSTParserLSTM
 # from .utils import vocab  # TODO: remove
 # from .utils import write_conll  # TODO: remove
@@ -146,7 +146,6 @@ class BISTModel(object):
         with open('app/modules/core/model/bist/params.json') as file:
             self.params = json.load(file)
 
-        from .mstlstm import MSTParserLSTM
         self.model = MSTParserLSTM(*self.params)
         self.model.model.populate(str(path))
 
