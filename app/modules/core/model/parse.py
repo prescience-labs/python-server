@@ -3,7 +3,20 @@ Preprocessing engine.
 """
 import json
 from pathlib import Path
+from typing import List
+
 import spacy
+
+from .utils import validate
+from .utils import validate_existing_filepath
+from .utils import _spacy_pos_to_ptb
+from .utils import get_options_dict
+from .utils import ConllEntry
+from .utils import CoreNLPDoc
+from .mstlstm import MSTParserLSTM
+# from .utils import vocab  # TODO: remove
+# from .utils import write_conll  # TODO: remove
+# from .utils import run_eval  # TODO: remove
 
 
 class SpacyInstance:
@@ -244,15 +257,3 @@ class SpacyBISTParser(object):
             if parsed_sent:
                 parsed_doc.sentences.append(parsed_sent)
         return parsed_doc
-
-
-from .utils import validate
-from .utils import validate_existing_filepath
-from .utils import _spacy_pos_to_ptb
-from .utils import get_options_dict
-# from .utils import vocab  # maybe no
-# from .utils import write_conll  # maybe no
-# from .utils import run_eval  # maybe no
-from .data_types import ConllEntry
-from .data_types import CoreNLPDoc
-from .mstlstm import MSTParserLSTM

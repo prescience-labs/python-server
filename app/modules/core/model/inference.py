@@ -2,12 +2,23 @@
 review.
 
 TODO:
-- fix circular dependencies and find a better directory structure
 - use import parse, utils, data_types and then dot notation instead of from?
 """
 import math
+from pathlib import Path
 
-from .data_types import CoreNLPDoc
+from .parse import SpacyBISTParser
+from .utils import _load_aspects_from_dict
+from .utils import _load_opinion_lex
+from .utils import _read_lexicon_from_csv
+from .utils import _consolidate_aspects
+from .utils import CoreNLPDoc
+from .utils import SentimentDoc
+from .utils import SentimentSentence
+from .utils import LexiconElement
+from .utils import Term
+from .utils import TermType
+from .utils import Polarity
 
 INTENSIFIER_FACTOR = 0.3
 
@@ -212,14 +223,3 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     sentiment_doc = inference.run(parsed_doc=parsed_doc)
 
     return sentiment_doc
-
-
-from .parse import SpacyBISTParser
-from .utils import _load_aspects_from_dict
-from .utils import _load_opinion_lex
-from .utils import _read_lexicon_from_csv
-from .utils import _consolidate_aspects
-from .data_types import SentimentDoc
-from .data_types import SentimentSentence
-from .data_types import LexiconElement
-from .data_types import Term
