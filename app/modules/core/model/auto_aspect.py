@@ -3,7 +3,7 @@ import collections
 import spacy
 
 
-def auto_aspect(in_review: str) -> dict:
+def auto_aspect(in_review: str, testing:bool = False) -> dict:
     """
     """
     nlp = spacy.load('en_core_web_sm')
@@ -17,25 +17,18 @@ def auto_aspect(in_review: str) -> dict:
     # better TODO comment
     doc_dict = build_dict_from_doc(doc, lower_candidates)
 
-    # distill candidates into clean aspect lexicon
+    # distill aspects into clean lexicon
     aspects = set()
-    for candidate in lower_candidates:
-        aspects.add(candidate)
+    for sent_idx, dict_of_token_dicts in doc_dict.items():
+        for token, info in dict_of_token_dicts.items():
+            if info['is_aspect']:
+                aspects.add(token.text.lower())
 
     # extract multi-word entities by grouping aspect terms that are neighbors (heuristic!)
     for sent_idx, dict_of_token_dicts in doc_dict.items():
         for i,j in zip(list(dict_of_token_dicts.items()), list(dict_of_token_dicts.items())[1:]):
             if i[1]['is_aspect']==j[1]['is_aspect'] and i[1]['is_aspect']:
                 aspects.add(f'{i[0]} {j[0]}'.lower())
-
-    # exclude aspects that were contextually POS-tagged as Verbs of any kind
-    # TODO: maybe exclude adjectives? check for other triggers but with an eye on recall
-    for sent_idx, dict_of_token_dicts in doc_dict.items():
-        for token, info in dict_of_token_dicts.items():
-            low_token = token.text.lower()
-            if low_token in aspects:
-                if info['pos'].startswith('V') or info['pos'].startswith('AD'):  # TODO: fix for "happy they"
-                    aspects.remove(low_token)
 
     # spin up synonyms for each aspect into dict format
     aspect_dict = {}
@@ -69,7 +62,12 @@ def check_if_aspect(token, lower_candidates):
     """
     """
     if token.text.lower() in lower_candidates:
-        return True
+        if token.pos_.startswith('V'):
+            return False
+        elif token.pos_ == 'ADJ':
+            return False
+        else:
+            return True
     else:
         return False
 
@@ -84,3 +82,12 @@ def extract_candidates(doc, stops) -> set:
                 candidates.append(token.text)
 
     return set(candidates)
+
+
+if __name__ == '__main__':
+    """Unit testing and experimentation"""
+    test_string = "Fantastic experience! If I was able to put 10 stars I would. I loved my experience it was really well done. The dogs were so cute and happy. I thought the staff were very knowledgeable they certainly know there stuff and the dogs really well. I loved how happy they were sitting on my lap. ( the dogs not the staff )    The tea and cake were delicious and made my experience perfect. What a great atmosphere and experience to have."
+    testing = True
+    result = auto_aspect(test_string, testing)
+    from pprint import pprint
+    pprint(result)
