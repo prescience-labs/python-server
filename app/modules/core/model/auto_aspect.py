@@ -34,7 +34,7 @@ def auto_aspect(in_review: str) -> dict:
         for token, info in dict_of_token_dicts.items():
             low_token = token.text.lower()
             if low_token in aspects:
-                if info['pos'].startswith('V') or info['pos'].startswith('AD'):
+                if info['pos'].startswith('V') or info['pos'].startswith('AD'):  # TODO: fix for "happy they"
                     aspects.remove(low_token)
 
     # spin up synonyms for each aspect into dict format

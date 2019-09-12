@@ -215,7 +215,7 @@ def inference(data: str, aspect_lex: dict, opinion_lex: str) -> dict:
     # initialize the inference engine object
     inference = SentimentInference(aspect_lex, opinion_lex, parse=False)
 
-    # source data is raw text, need to parse
+    # source data is raw text, perform preprocessing here including tokenization, POS-tagging, & most importantly dependency parsing
     parse = SpacyBISTParser(bist_model='app/modules/core/model/bist/bist.model').parse
     parsed_doc = parse(data)  # but do this as preprocessing?
 
