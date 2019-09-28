@@ -66,7 +66,10 @@ class SentimentInference(object):
                 sentiment_doc.sentences.append(
                     SentimentSentence(sentence[0]['start'],
                                       sentence[-1]['start'] + sentence[-1]['len'] - 1, events))
-        return sentiment_doc.json()
+        if sentiment_doc:
+            return sentiment_doc.json()
+        else:
+            return {'NONE': 'No sentiment events found.'}
 
     def _extract_intensifier_terms(self, toks, sentiment_index, polarity, sentence):
         """Extract intensifier events from sentence."""

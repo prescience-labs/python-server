@@ -1,3 +1,11 @@
+"""
+TODO:
+- multi-method aspect extraction including
+-    NER
+-    POS pattern matching extrapolated from baseline aspect lexicon
+-    vector similarity against a baseline aspect lexicon
+-    V1 of this on amazon dataset into baseline to bootstrap into V2 (> POS patterns, embeddings for similarity)
+"""
 import collections
 
 import spacy
@@ -33,8 +41,17 @@ def auto_aspect(in_review: str, testing:bool = False) -> dict:
     # spin up synonyms for each aspect into dict format
     aspect_dict = {}
     for asp in aspects:
-        # wordnet syns, embeddings above sim threshold
+        if testing:
+            import nltk
+            # wordnet syns, embeddings above sim threshold
+            # syns = wn.synsets(asp, pos=wn.NOUN)
+            text = nltk.Text(word.lower() for word in in_review)
+            syns = text.similar(asp)  # do auto-aspect on all of amazon dataset, then do this and emb similarity at inference against that baseline using some kind of search algorithms?
+            print(asp, syns, sep='\t')
         aspect_dict[asp] = [asp, asp.upper(), asp.lower(), asp + 's']
+
+    if testing:
+        print([(str(x), x.label_) for x in doc.ents], flush=True)
 
     return aspect_dict
 
@@ -86,8 +103,13 @@ def extract_candidates(doc, stops) -> set:
 
 if __name__ == '__main__':
     """Unit testing and experimentation"""
-    test_string = "Fantastic experience! If I was able to put 10 stars I would. I loved my experience it was really well done. The dogs were so cute and happy. I thought the staff were very knowledgeable they certainly know there stuff and the dogs really well. I loved how happy they were sitting on my lap. ( the dogs not the staff )    The tea and cake were delicious and made my experience perfect. What a great atmosphere and experience to have."
-    testing = True
-    result = auto_aspect(test_string, testing)
-    from pprint import pprint
-    pprint(result)
+    # test_string = "Fantastic experience! If I was able to put 10 stars I would. I loved my experience it was really well done. The dogs were so cute and happy. I thought the staff were very knowledgeable they certainly know there stuff and the dogs really well. I loved how happy they were sitting on my lap. ( the dogs not the staff )    The tea and cake were delicious and made my experience perfect. What a great atmosphere and experience to have."
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--testing", action="store_true", help="testing and experimentation")
+    parser.add_argument("-b", "--batch", action="store_true", help="batch mode")
+    args = parser.parse_args()
+    if args.testing:
+        result = auto_aspect(test_string, testing)
+        from pprint import pprint
+        pprint(result)
