@@ -14,9 +14,6 @@ from ..utils import get_options_dict
 from ..utils import ConllEntry
 from ..utils import CoreNLPDoc
 from .mstlstm import MSTParserLSTM
-# from .utils import vocab  # TODO: remove
-# from .utils import write_conll  # TODO: remove
-# from .utils import run_eval  # TODO: remove
 
 
 class SpacyInstance:
@@ -30,6 +27,7 @@ class SpacyInstance:
     """
 
     def __init__(self, model="en-core-web-sm", disable=None, display_prompt=True):
+        # this was wiggy when tried to pass spacy.load() the name of the model, better to load directly
         # self._parser = spacy.load(model, disable=disable)
         self._parser = spacy.load("en_core_web_sm", disable=disable)
 
@@ -46,7 +44,6 @@ class SpacyInstance:
         Returns:
             list: a list of str tokens of input
         """
-        # pylint: disable=not-callable
 
         return [t.text for t in self.parser(text)]
 
@@ -119,11 +116,7 @@ class BISTModel(object):
 
         print('\nRunning predict on ' + dataset + '...\n')
         res = list(self.model.predict(conll_path=dataset))
-        # if evaluate:
-        #     ext = dataset.rindex('.')
-        #     pred_path = dataset[:ext] + '_pred' + dataset[ext:]
-        #     write_conll(pred_path, res)
-        #     run_eval(dataset, pred_path)
+
         return res
 
     def predict_conll(self, dataset):
@@ -142,7 +135,8 @@ class BISTModel(object):
 
     def load(self, path):
         """Loads and initializes a BIST model from file."""
-        # with open(path.parent / 'params.json') as file:
+        # do this better with Path objects
+        # something like with open(path.parent / 'params.json') as file:
         with open('app/modules/core/model/bist/params.json') as file:
             self.params = json.load(file)
 
