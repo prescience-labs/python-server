@@ -3,11 +3,11 @@
 import csv
 import json
 import re
-from json import JSONEncoder
 from enum import Enum
+from json import JSONEncoder
+from os import PathLike
 from pathlib import Path
 from typing import Union
-from os import PathLike
 
 
 def _load_aspects_from_dict(aspect_lex: dict):
